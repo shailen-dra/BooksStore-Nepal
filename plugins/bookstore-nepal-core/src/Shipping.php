@@ -102,6 +102,28 @@ class Shipping {
 		'rest'      => 200,
 		'free_over' => 2000,
 	) ): array {
+		return self::apply( $rates, false );
+	}
+
+	/**
+	 * Creates missing zones with placeholder rates and leaves existing zones alone.
+	 * Any rate passed in $overrides (keys valley, rest, free_over) is applied, even to existing zones.
+	 *
+	 * @param array $overrides Optional rates to set (NPR).
+	 * @return string[] Human-readable errors; empty array means success.
+	 */
+	public static function seed( array $overrides = array() ): array {
+		return self::apply( $overrides, true );
+	}
+
+	/**
+	 * Shared implementation of install() and seed().
+	 *
+	 * @param array $given Rates supplied by the caller.
+	 * @param bool  $seed  True to keep existing zones and only apply given rates to them.
+	 * @return string[]
+	 */
+	private static function apply( array $given, bool $seed ): array {
 		if ( ! class_exists( '\WC_Shipping_Zones' ) || ! class_exists( '\WC_Shipping_Zone' ) ) {
 			return self::report( array( __( 'WooCommerce is required to set up shipping.', 'bookstore-nepal' ) ) );
 		}
@@ -112,7 +134,7 @@ class Shipping {
 				'rest'      => 200,
 				'free_over' => 2000,
 			),
-			$rates
+			$given
 		);
 		$errors = array();
 
@@ -122,19 +144,23 @@ class Shipping {
 		}
 
 		$zones = array(
-			array( self::ZONE_VALLEY, 0, $valley_locations, $rates['valley'] ),
-			array( self::ZONE_REST, 1, array( array( 'code' => 'NP', 'type' => 'country' ) ), $rates['rest'] ),
+			array( self::ZONE_VALLEY, 0, $valley_locations, $rates['valley'], 'valley' ),
+			array( self::ZONE_REST, 1, array( array( 'code' => 'NP', 'type' => 'country' ) ), $rates['rest'], 'rest' ),
 		);
 
-		foreach ( $zones as list( $name, $order, $locations, $cost ) ) {
-			$zone = self::find_zone( $name ) ?? new \WC_Shipping_Zone( null );
-			$zone->set_zone_name( $name );
-			$zone->set_zone_order( $order );
-			$zone->clear_locations( array( 'state', 'country', 'continent', 'postcode' ) );
-			foreach ( $locations as $location ) {
-				$zone->add_location( $location['code'], $location['type'] );
+		foreach ( $zones as list( $name, $order, $locations, $cost, $rate_key ) ) {
+			$existing = self::find_zone( $name );
+			$keep     = $seed && null !== $existing;
+			$zone     = $existing ?? new \WC_Shipping_Zone( null );
+			if ( ! $keep ) {
+				$zone->set_zone_name( $name );
+				$zone->set_zone_order( $order );
+				$zone->clear_locations( array( 'state', 'country', 'continent', 'postcode' ) );
+				foreach ( $locations as $location ) {
+					$zone->add_location( $location['code'], $location['type'] );
+				}
+				$zone->save();
 			}
-			$zone->save();
 
 			if ( ! $zone->get_id() ) {
 				/* translators: %s: zone name. */
@@ -150,6 +176,19 @@ class Shipping {
 					'title'      => __( 'Free delivery', 'bookstore-nepal' ),
 				),
 			);
+			if ( $keep ) {
+				// Existing zone: touch only the rates the caller explicitly gave.
+				$settings = array();
+				if ( isset( $given[ $rate_key ] ) ) {
+					$settings['flat_rate'] = array( 'cost' => (string) $cost );
+				}
+				if ( isset( $given['free_over'] ) ) {
+					$settings['free_shipping'] = array(
+						'requires'   => 'min_amount',
+						'min_amount' => (string) $rates['free_over'],
+					);
+				}
+			}
 			foreach ( $settings as $method_id => $values ) {
 				$error = self::ensure_method( $zone, $method_id, $values );
 				if ( $error ) {

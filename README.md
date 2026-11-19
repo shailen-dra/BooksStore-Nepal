@@ -71,12 +71,12 @@ vendor/bin/phpunit
 # Optional env: WP_TESTS_DIR (default: system temp dir/wordpress-tests-lib), WC_PLUGIN_DIR (default: the Herd site's WooCommerce)
 ```
 
-> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. The theme and `wp bsn setup` arrive in later tasks; `bin/link-local.sh` skips the theme until it exists.
+> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. `wp bsn setup` leaves existing shipping rates alone; pass `--valley=<npr> --rest=<npr> --free-over=<npr>` to change them. The theme arrives in a later task; `bin/link-local.sh` skips the theme until it exists.
 
 ## Payments: test mode
 
 - **eSewa:** WooCommerce → Settings → Payments → eSewa. Test mode uses product code `EPAYTEST` and eSewa's public test secret. Live keys come from the client's eSewa merchant account.
-- **Khalti:** configure the official Khalti plugin with sandbox keys from the Khalti merchant dashboard.
+- **Khalti:** plugin slug `integrate-khalti-in-wc-store` ("Integrate Khalti in WC Store", wordpress.org account `khaltiwp`, built by ACT360, linked from khalti.com). Install with `wp plugin install integrate-khalti-in-wc-store --activate`, then enter sandbox keys from the Khalti merchant dashboard in WooCommerce -> Settings -> Payments -> Khalti. **Known limitation:** this plugin has no WooCommerce Blocks integration, so it does not render in the block checkout, which this site uses. It ships enabled by default, so keep it disabled until keys and a block-checkout decision are in place.
 - Never commit payment keys. They live only in each site's wp-admin settings.
 
 ## Open items from the client

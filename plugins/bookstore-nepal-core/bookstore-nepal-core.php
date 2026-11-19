@@ -47,7 +47,15 @@ add_action( 'plugins_loaded', 'bsn_boot', 20 );
 
 register_activation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Catalog::class, 'install' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Catalog::class, 'register' ) );
-register_activation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Shipping::class, 'install' ) );
+// A closure: WordPress passes $network_wide to activation hooks, which seed() must not receive.
+register_activation_hook(
+	BSN_PLUGIN_FILE,
+	static function (): void {
+		\BookstoreNepal\Shipping::seed();
+	}
+);
 add_action( 'bsn_booted', array( \BookstoreNepal\Shipping::class, 'register' ) );
 add_action( 'before_woocommerce_init', array( \BookstoreNepal\Gateway\EsewaGateway::class, 'declare_compatibility' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\EsewaGateway::class, 'register' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\OrderStatuses::class, 'register' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\Cli\SetupCommand::class, 'register' ) );
