@@ -59,3 +59,4 @@ add_action( 'before_woocommerce_init', array( \BookstoreNepal\Gateway\EsewaGatew
 add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\EsewaGateway::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\OrderStatuses::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Cli\SetupCommand::class, 'register' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\GiftFinder::class, 'register' ) );
