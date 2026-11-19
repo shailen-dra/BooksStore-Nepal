@@ -58,8 +58,16 @@ class Catalog {
 
 	/**
 	 * Creates attributes and terms; safe to run repeatedly.
+	 *
+	 * @return string[] Human-readable errors; empty array means success.
 	 */
-	public static function install(): void {
+	public static function install(): array {
+		if ( ! function_exists( 'wc_create_attribute' ) || ! class_exists( '\WC_Cache_Helper' ) ) {
+			return self::report( array( __( 'WooCommerce is required to set up the catalogue.', 'bookstore-nepal' ) ) );
+		}
+
+		$errors = array();
+
 		// Make sure lookups below reflect the database, not stale caches.
 		delete_transient( 'wc_attribute_taxonomies' );
 		\WC_Cache_Helper::invalidate_cache_group( 'woocommerce-attributes' );
@@ -79,6 +87,8 @@ class Catalog {
 					)
 				);
 				if ( is_wp_error( $created ) ) {
+					/* translators: 1: attribute slug, 2: error message. */
+					$errors[] = sprintf( __( 'Could not create attribute %1$s: %2$s', 'bookstore-nepal' ), $slug, $created->get_error_message() );
 					continue;
 				}
 			}
@@ -88,13 +98,33 @@ class Catalog {
 			}
 
 			foreach ( $terms as $term_slug => $name ) {
-				if ( ! get_term_by( 'slug', $term_slug, $taxonomy ) ) {
-					wp_insert_term( $name, $taxonomy, array( 'slug' => $term_slug ) );
+				if ( get_term_by( 'slug', $term_slug, $taxonomy ) ) {
+					continue;
+				}
+				$inserted = wp_insert_term( $name, $taxonomy, array( 'slug' => $term_slug ) );
+				if ( is_wp_error( $inserted ) ) {
+					/* translators: 1: term name, 2: attribute slug, 3: error message. */
+					$errors[] = sprintf( __( 'Could not create term %1$s in %2$s: %3$s', 'bookstore-nepal' ), $name, $slug, $inserted->get_error_message() );
 				}
 			}
 		}
 		delete_transient( 'wc_attribute_taxonomies' );
 		\WC_Cache_Helper::invalidate_cache_group( 'woocommerce-attributes' );
+
+		return self::report( $errors );
+	}
+
+	/**
+	 * Logs errors and passes them through.
+	 *
+	 * @param string[] $errors Errors.
+	 * @return string[]
+	 */
+	private static function report( array $errors ): array {
+		foreach ( $errors as $error ) {
+			error_log( 'bookstore-nepal: ' . $error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+		return $errors;
 	}
 
 	/**

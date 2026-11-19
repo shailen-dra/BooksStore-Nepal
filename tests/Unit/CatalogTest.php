@@ -83,4 +83,90 @@ class CatalogTest extends WP_UnitTestCase {
 		$this->assertNotEmpty( $link );
 		$this->assertTrue( mb_check_encoding( $link, 'UTF-8' ) );
 	}
+
+	private function silence_error_log(): void {
+		$old = ini_get( 'error_log' );
+		ini_set( 'error_log', sys_get_temp_dir() . '/bsn-test-error.log' ); // phpcs:ignore
+		$this->silenced = $old;
+	}
+
+	public function tear_down(): void {
+		if ( null !== $this->silenced ) {
+			ini_set( 'error_log', (string) $this->silenced ); // phpcs:ignore
+			$this->silenced = null;
+		}
+		parent::tear_down();
+	}
+
+	/** @var string|false|null */
+	private $silenced = null;
+
+	public function test_install_returns_empty_array_on_success(): void {
+		$this->assertSame( array(), Catalog::install() );
+	}
+
+	public function test_install_reports_attribute_creation_failure(): void {
+		$this->silence_error_log();
+		// A taxonomy already registered without a DB row makes wc_create_attribute fail.
+		register_taxonomy( 'pa_language', array( 'product' ) );
+		$errors = Catalog::install();
+		$this->assertNotEmpty( $errors );
+		$this->assertContainsOnly( 'string', $errors );
+		$this->assertStringContainsString( 'language', implode( ' ', $errors ) );
+	}
+
+	public function test_install_reports_term_insert_failure(): void {
+		$this->silence_error_log();
+		$fail = static fn( $term ) => 'Story' === $term ? new WP_Error( 'forced', 'forced failure' ) : $term;
+		add_filter( 'pre_insert_term', $fail );
+		$errors = Catalog::install();
+		remove_filter( 'pre_insert_term', $fail );
+		$this->assertCount( 1, $errors );
+		$this->assertStringContainsString( 'Story', $errors[0] );
+		$this->assertStringContainsString( 'forced failure', $errors[0] );
+	}
+
+	public function test_details_hook_registered_at_priority_25(): void {
+		Catalog::register();
+		$this->assertSame( 25, has_action( 'woocommerce_single_product_summary', array( Catalog::class, 'render_details' ) ) );
+	}
+
+	private function render_for( WC_Product $product ): string {
+		$GLOBALS['product'] = $product;
+		ob_start();
+		Catalog::render_details();
+		return ob_get_clean();
+	}
+
+	public function test_render_details_outputs_escaped_values(): void {
+		Catalog::install();
+		$product = new WC_Product_Simple();
+		$product->set_name( 'B' );
+		$product->update_meta_data( Catalog::META_AUTHOR, 'Devkota' );
+		$product->update_meta_data( Catalog::META_PAGES, '32' );
+		$id = $product->save();
+		wp_set_object_terms( $id, array( '4-7' ), 'pa_age-group' );
+		wp_set_object_terms( $id, array( 'nepali' ), 'pa_language' );
+		$html = $this->render_for( wc_get_product( $id ) );
+		foreach ( array( 'Devkota', '4–7', 'Nepali', '32' ) as $v ) {
+			$this->assertStringContainsString( $v, $html );
+		}
+	}
+
+	public function test_render_details_empty_when_no_values(): void {
+		$product = new WC_Product_Simple();
+		$product->set_name( 'Empty' );
+		$product->save();
+		$this->assertSame( '', $this->render_for( $product ) );
+	}
+
+	public function test_render_details_escapes_author(): void {
+		$product = new WC_Product_Simple();
+		$product->set_name( 'X' );
+		$product->update_meta_data( Catalog::META_AUTHOR, '<script>alert(1)</script>' );
+		$product->save();
+		$html = $this->render_for( $product );
+		$this->assertStringNotContainsString( '<script>', $html );
+		$this->assertStringContainsString( '&lt;script&gt;', $html );
+	}
 }
