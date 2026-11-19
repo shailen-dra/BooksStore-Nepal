@@ -24,22 +24,38 @@ This repo holds only our custom code. WordPress core, WooCommerce and third-part
 ## Tech stack
 
 - WordPress 6.x + WooCommerce
-- PHP 8.1+ (local: Laravel Herd, PHP 8.3), MySQL 8
+- PHP 8.1+ (local: Laravel Herd, PHP 8.3), MariaDB 10.6+ or MySQL 8
 - WP-CLI, Composer, PHPUnit 9
 - Payments: eSewa ePay v2 (custom gateway in our plugin), Khalti (official WooCommerce plugin), WooCommerce cash on delivery
 
 ## Local development
 
-Requirements: [Laravel Herd](https://herd.laravel.com), MySQL (`brew install mysql`), WP-CLI (`brew install wp-cli`), Composer.
+Requirements: [Laravel Herd](https://herd.laravel.com), MariaDB 10.6+ or MySQL 8 listening on 127.0.0.1:3306, WP-CLI (`brew install wp-cli`), Composer.
+
+One-time database setup (as a DB admin), creating a `bookstore` user used by the site and the tests:
+
+```sql
+CREATE DATABASE bookstore_nepal;
+CREATE DATABASE wp_tests;
+CREATE USER 'bookstore'@'127.0.0.1' IDENTIFIED BY 'bookstore';
+GRANT ALL ON bookstore_nepal.* TO 'bookstore'@'127.0.0.1';
+GRANT ALL ON wp_tests.* TO 'bookstore'@'127.0.0.1';
+```
+
+`wp_tests` is wiped on every test run, so never point the tests at a database you care about.
 
 ```bash
 # 1. WordPress site served by Herd at http://bookstore-nepal.test
-mysql -u root -e "CREATE DATABASE bookstore_nepal"
 mkdir -p ~/Herd/bookstore-nepal && cd ~/Herd/bookstore-nepal
 wp core download
-wp config create --dbname=bookstore_nepal --dbuser=root --dbpass=''
+wp config create --dbname=bookstore_nepal --dbuser=bookstore --dbpass=bookstore --dbhost=127.0.0.1 \
+  --extra-php <<'PHP'
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', true );
+define( 'WP_DEBUG_DISPLAY', false );
+PHP
 wp core install --url=bookstore-nepal.test --title="Bookstore Nepal" \
-  --admin_user=admin --admin_email=admin@example.com --prompt=admin_password
+  --admin_user=admin --admin_email=admin@example.com --admin_password=admin --skip-email
 wp plugin install woocommerce --activate
 
 # 2. Link this repo's plugin and theme into the site, then configure the store
@@ -50,11 +66,12 @@ wp --path=~/Herd/bookstore-nepal bsn setup
 
 # 3. Tests
 composer install
-bash bin/install-wp-tests.sh wp_tests root '' 127.0.0.1 latest
+bash bin/install-wp-tests.sh wp_tests bookstore bookstore 127.0.0.1 latest true
 vendor/bin/phpunit
+# Optional env: WP_TESTS_DIR (default: system temp dir/wordpress-tests-lib), WC_PLUGIN_DIR (default: the Herd site's WooCommerce)
 ```
 
-> The `bin/` scripts, plugin and theme are created by the build plan. Until those tasks are done, only step 1 works.
+> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. The theme and `wp bsn setup` arrive in later tasks; `bin/link-local.sh` skips the theme until it exists.
 
 ## Payments: test mode
 

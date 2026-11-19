@@ -1,0 +1,46 @@
+<?php
+/**
+ * Plugin Name:       Bookstore Nepal Core
+ * Description:       Catalogue attributes, Nepal shipping, eSewa gateway, gift finder and store setup for Bookstore Nepal.
+ * Version:           0.1.0
+ * Requires PHP:      8.1
+ * Requires Plugins:  woocommerce
+ * Text Domain:       bookstore-nepal
+ *
+ * @package BookstoreNepal
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+define( 'BSN_VERSION', '0.1.0' );
+define( 'BSN_PLUGIN_FILE', __FILE__ );
+
+$bsn_autoload = __DIR__ . '/vendor/autoload.php';
+if ( file_exists( $bsn_autoload ) ) {
+	require_once $bsn_autoload;
+} else {
+	spl_autoload_register(
+		static function ( string $class_name ): void {
+			$prefix = 'BookstoreNepal\\';
+			if ( 0 !== strpos( $class_name, $prefix ) ) {
+				return;
+			}
+			$relative = str_replace( '\\', '/', substr( $class_name, strlen( $prefix ) ) );
+			$file     = __DIR__ . '/src/' . $relative . '.php';
+			if ( is_readable( $file ) ) {
+				require_once $file;
+			}
+		}
+	);
+}
+
+/**
+ * Boots the plugin once WooCommerce has loaded.
+ */
+function bsn_boot(): void {
+	if ( ! class_exists( 'WooCommerce' ) ) {
+		return;
+	}
+	do_action( 'bsn_booted' );
+}
+add_action( 'plugins_loaded', 'bsn_boot', 20 );

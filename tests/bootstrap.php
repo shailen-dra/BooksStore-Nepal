@@ -1,0 +1,58 @@
+<?php
+/**
+ * PHPUnit bootstrap: WordPress test suite + WooCommerce + our plugin.
+ *
+ * Env overrides: WP_TESTS_DIR, WC_PLUGIN_DIR.
+ *
+ * @package BookstoreNepal
+ */
+
+$bsn_tests_dir = getenv( 'WP_TESTS_DIR' );
+if ( ! $bsn_tests_dir ) {
+	$bsn_tests_dir = rtrim( sys_get_temp_dir(), '/\\' ) . '/wordpress-tests-lib';
+}
+
+$bsn_polyfills = dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills';
+if ( ! getenv( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH' ) ) {
+	putenv( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH=' . $bsn_polyfills );
+}
+
+if ( ! file_exists( $bsn_tests_dir . '/includes/functions.php' ) ) {
+	echo "Could not find {$bsn_tests_dir}/includes/functions.php. Run bin/install-wp-tests.sh or set WP_TESTS_DIR.\n";
+	exit( 1 );
+}
+
+require_once $bsn_tests_dir . '/includes/functions.php';
+
+tests_add_filter(
+	'muplugins_loaded',
+	static function (): void {
+		$wc_dir = getenv( 'WC_PLUGIN_DIR' );
+		if ( ! $wc_dir ) {
+			$wc_dir = getenv( 'HOME' ) . '/Herd/bookstore-nepal/wp-content/plugins/woocommerce';
+		}
+		$wc_file = rtrim( $wc_dir, '/' ) . '/woocommerce.php';
+		if ( ! file_exists( $wc_file ) ) {
+			echo "WooCommerce not found at {$wc_file}. Set WC_PLUGIN_DIR.\n";
+			exit( 1 );
+		}
+		require $wc_file;
+		require dirname( __DIR__ ) . '/plugins/bookstore-nepal-core/bookstore-nepal-core.php';
+	}
+);
+
+// Create WooCommerce tables once the test DB is ready.
+tests_add_filter(
+	'setup_theme',
+	static function (): void {
+		if ( ! class_exists( 'WC_Install' ) ) {
+			return;
+		}
+		define( 'WP_UNINSTALL_PLUGIN', true );
+		WC_Install::install();
+		$GLOBALS['wp_roles'] = null;
+		wp_roles();
+	}
+);
+
+require $bsn_tests_dir . '/includes/bootstrap.php';
