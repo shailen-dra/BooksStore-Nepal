@@ -49,3 +49,5 @@ register_activation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Catalog::class
 add_action( 'bsn_booted', array( \BookstoreNepal\Catalog::class, 'register' ) );
 register_activation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Shipping::class, 'install' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Shipping::class, 'register' ) );
+add_action( 'before_woocommerce_init', array( \BookstoreNepal\Gateway\EsewaGateway::class, 'declare_compatibility' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\EsewaGateway::class, 'register' ) );
