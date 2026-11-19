@@ -44,3 +44,6 @@ function bsn_boot(): void {
 	do_action( 'bsn_booted' );
 }
 add_action( 'plugins_loaded', 'bsn_boot', 20 );
+
+register_activation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Catalog::class, 'install' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\Catalog::class, 'register' ) );
