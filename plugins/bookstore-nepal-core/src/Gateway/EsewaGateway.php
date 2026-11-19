@@ -13,6 +13,9 @@
 
 namespace BookstoreNepal\Gateway;
 
+use Automattic\WooCommerce\Caches\OrderCache;
+use Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore;
+use Automattic\WooCommerce\Utilities\OrderUtil;
 use WC_Order;
 use WC_Payment_Gateway;
 
@@ -346,22 +349,30 @@ class EsewaGateway extends WC_Payment_Gateway {
 			return wc_get_cart_url();
 		}
 
-		if ( 'failure' === $result ) {
-			return $this->handle_failure( $order );
-		}
-		if ( 'success' !== $result ) {
+		if ( 'success' !== $result && 'failure' !== $result ) {
 			wc_add_notice( __( 'We could not match this eSewa payment to an order. Please contact us if money was deducted.', 'bookstore-nepal' ), 'error' );
 			return wc_get_cart_url();
 		}
 
-		$lock = $this->lock( $order->get_id() );
+		$order_id = $order->get_id();
+		$lock     = $this->lock( $order_id );
 		if ( null === $lock ) {
-			// Another request for this order is still being processed; let it finish.
+			// Another request for this order is still running (e.g. waiting on the status API).
+			error_log( sprintf( 'Bookstore Nepal eSewa: could not lock order %d for the %s callback; another request is still processing it.', $order_id, $result ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			wc_add_notice( __( 'We’re still confirming your eSewa payment. Please refresh this page in a moment, or contact us if it does not update.', 'bookstore-nepal' ), 'notice' );
 			return $order->get_checkout_order_received_url();
 		}
 		try {
-			// Re-read after taking the lock so a concurrent duplicate sees the paid state.
-			$order = wc_get_order( $order->get_id() );
+			// Re-read from the database, not this request's caches, so a request that
+			// waited for the lock sees what the previous holder committed.
+			$order = $this->reload_order( $order_id );
+			if ( null === $order ) {
+				wc_add_notice( __( 'We could not match this eSewa payment to an order. Please contact us if money was deducted.', 'bookstore-nepal' ), 'error' );
+				return wc_get_cart_url();
+			}
+			if ( 'failure' === $result ) {
+				return $this->handle_failure( $order );
+			}
 			if ( $order->is_paid() ) {
 				return $order->get_checkout_order_received_url();
 			}
@@ -552,6 +563,26 @@ class EsewaGateway extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Loads an order bypassing request-local caches: WooCommerce's order object cache
+	 * (HPOS), the HPOS datastore cache, and the post/meta caches (CPT store). Without
+	 * this, a request that waited for the lock would see the order as it was before
+	 * the other request paid it, and pay or fail it a second time.
+	 *
+	 * @param int $order_id Order ID.
+	 */
+	private function reload_order( int $order_id ): ?WC_Order {
+		if ( class_exists( OrderCache::class ) ) {
+			wc_get_container()->get( OrderCache::class )->remove( $order_id );
+		}
+		if ( OrderUtil::custom_orders_table_usage_is_enabled() && class_exists( OrdersTableDataStore::class ) ) {
+			wc_get_container()->get( OrdersTableDataStore::class )->clear_cached_data( array( $order_id ) );
+		}
+		clean_post_cache( $order_id );
+		$order = wc_get_order( $order_id );
+		return $order instanceof WC_Order ? $order : null;
+	}
+
+	/**
 	 * Serialises callbacks for one order (MySQL named lock), so a double submit
 	 * cannot complete the order twice.
 	 *
@@ -561,7 +592,13 @@ class EsewaGateway extends WC_Payment_Gateway {
 	private function lock( int $order_id ): ?string {
 		global $wpdb;
 		$name = 'bsn_esewa_' . $order_id;
-		$got  = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, 10 ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		/**
+		 * Seconds to wait for another callback on the same order to finish.
+		 *
+		 * @param int $timeout Seconds.
+		 */
+		$timeout = max( 0, (int) apply_filters( 'bsn_esewa_lock_timeout', self::STATUS_TIMEOUT + 5 ) );
+		$got     = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, $timeout ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		return '1' === (string) $got ? $name : null;
 	}
 

@@ -50,6 +50,8 @@ tests_add_filter(
 		}
 		define( 'WP_UNINSTALL_PLUGIN', true );
 		WC_Install::install();
+		// HPOS tables too, so tests can run against either order store.
+		wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\DataSynchronizer::class )->create_database_tables();
 		$GLOBALS['wp_roles'] = null;
 		wp_roles();
 	}

@@ -123,7 +123,109 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 	}
 
 	private function fresh( WC_Order $order ): WC_Order {
+		$this->evict( $order->get_id() );
 		return wc_get_order( $order->get_id() );
+	}
+
+	/**
+	 * Drops this request's cached copies of an order (HPOS order cache, CPT post/meta caches).
+	 */
+	private function evict( int $id ): void {
+		wc_get_container()->get( \Automattic\WooCommerce\Caches\OrderCache::class )->remove( $id );
+		clean_post_cache( $id );
+	}
+
+	/**
+	 * Simulates a concurrent request: this request has the order cached as pending,
+	 * then another request completes the payment and commits it. This request's
+	 * caches still hold the pre-payment copy afterwards.
+	 */
+	private function pay_behind_stale_cache( WC_Order $order ): void {
+		$id    = $order->get_id();
+		$this->evict( $id );
+		$stale      = wc_get_order( $id ); // Primes the caches with the pending order.
+		$stale_post = wp_cache_get( $id, 'posts' );
+		$stale_meta = wp_cache_get( $id, 'post_meta' );
+
+		$other = new WC_Order( $id );
+		$other->payment_complete( 'OTHER-REQUEST' );
+
+		if ( \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled() ) {
+			wc_get_container()->get( \Automattic\WooCommerce\Caches\OrderCache::class )->set( $stale, $id );
+		} else {
+			wp_cache_set( $id, $stale_post, 'posts' );
+			wp_cache_set( $id, $stale_meta, 'post_meta' );
+		}
+		$this->assertSame( 'pending', wc_get_order( $id )->get_status(), 'Precondition: this request sees a stale pending copy.' );
+		$this->assertSame( 9, wc_get_product( $this->product->get_id() )->get_stock_quantity(), 'Precondition: stock reduced by the other request.' );
+	}
+
+	public function test_concurrent_duplicate_behind_stale_cache_not_completed_twice(): void {
+		$order = $this->order();
+		$this->status_api( 'COMPLETE', $order->get_meta( EsewaGateway::META_UUID ) );
+		$query = $this->success_query( $order, $this->payload( $order ) );
+		$this->pay_behind_stale_cache( $order );
+
+		$completions = did_action( 'woocommerce_payment_complete' );
+		$email_hooks = did_action( 'woocommerce_order_status_pending_to_processing' );
+		$redirect    = $this->gateway->handle_callback( $query );
+
+		$order = $this->fresh( $order );
+		$this->assertSame( $order->get_checkout_order_received_url(), $redirect );
+		$this->assertSame( 'processing', $order->get_status() );
+		$this->assertSame( 'OTHER-REQUEST', $order->get_transaction_id() );
+		$this->assertSame( $completions, did_action( 'woocommerce_payment_complete' ), 'payment_complete not called again.' );
+		$this->assertSame( $email_hooks, did_action( 'woocommerce_order_status_pending_to_processing' ), 'No second email.' );
+		$this->assertSame( 9, wc_get_product( $this->product->get_id() )->get_stock_quantity(), 'Stock reduced once.' );
+		$this->assertSame( array(), $this->requested, 'Status API not called for a paid order.' );
+	}
+
+	public function test_failure_url_behind_stale_cache_leaves_paid_order_paid(): void {
+		$order = $this->order();
+		$this->pay_behind_stale_cache( $order );
+
+		$redirect = $this->gateway->handle_callback(
+			array(
+				'result'   => 'failure',
+				'order_id' => (string) $order->get_id(),
+				'key'      => $order->get_order_key(),
+			)
+		);
+
+		$order = $this->fresh( $order );
+		$this->assertSame( 'processing', $order->get_status() );
+		$this->assertTrue( $order->is_paid() );
+		$this->assertSame( $order->get_checkout_order_received_url(), $redirect );
+	}
+
+	public function test_lock_held_elsewhere_logs_and_tells_customer(): void {
+		$order = $this->order();
+		$this->status_api( 'COMPLETE', $order->get_meta( EsewaGateway::META_UUID ) );
+
+		// Another request (separate DB connection) is processing this order.
+		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_esewa_' . $order->get_id() ) ) );
+		add_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
+		$log      = wp_tempnam( 'bsn-esewa-log' );
+		$previous = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet
+
+		try {
+			$redirect = $this->gateway->handle_callback( $this->success_query( $order, $this->payload( $order ) ) );
+		} finally {
+			ini_set( 'error_log', (string) $previous ); // phpcs:ignore WordPress.PHP.IniSet
+			remove_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
+			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_esewa_' . $order->get_id() ) );
+			$other->close();
+		}
+
+		$logged = (string) file_get_contents( $log );
+		unlink( $log );
+		$this->assertStringContainsString( 'order ' . $order->get_id(), $logged );
+		$this->assertSame( $order->get_checkout_order_received_url(), $redirect );
+		$this->assertFalse( $this->fresh( $order )->is_paid() );
+		$this->assertSame( array(), $this->requested );
+		$notices = wp_list_pluck( wc_get_notices( 'notice' ), 'notice' );
+		$this->assertContains( 'We’re still confirming your eSewa payment. Please refresh this page in a moment, or contact us if it does not update.', $notices );
 	}
 
 	private function notes( WC_Order $order ): string {
