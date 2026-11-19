@@ -10,7 +10,7 @@ class GiftFinderTest extends WP_UnitTestCase {
 
 	public function test_url_with_age_and_budget(): void {
 		$url = GiftFinder::url( '4-7', 1000 );
-		$this->assertStringStartsWith( wc_get_page_permalink( 'shop' ), $url );
+		$this->assertStringStartsWith( GiftFinder::shop_url(), $url );
 		$this->assertSame(
 			array(
 				'filter_age-group'     => '4-7',
@@ -28,7 +28,7 @@ class GiftFinderTest extends WP_UnitTestCase {
 	}
 
 	public function test_invalid_age_falls_back_to_shop(): void {
-		$this->assertSame( wc_get_page_permalink( 'shop' ), GiftFinder::url( 'bogus', 500 ) );
+		$this->assertSame( GiftFinder::shop_url(), GiftFinder::url( 'bogus', 500 ) );
 	}
 
 	public function test_shortcode_renders_all_age_options(): void {
@@ -47,7 +47,39 @@ class GiftFinderTest extends WP_UnitTestCase {
 		$t = GiftFinder::target_from_request( array( 'bsn_gift_age' => '4-7', 'bsn_gift_budget' => '500' ) );
 		$this->assertSame( GiftFinder::url( '4-7', 500 ), $t );
 		$this->assertSame( GiftFinder::url( '4-7', null ), GiftFinder::target_from_request( array( 'bsn_gift_age' => '4-7', 'bsn_gift_budget' => '999' ) ) );
-		$this->assertSame( wc_get_page_permalink( 'shop' ), GiftFinder::target_from_request( array( 'bsn_gift_age' => 'x', 'bsn_gift_budget' => '500' ) ) );
+		$this->assertSame( GiftFinder::shop_url(), GiftFinder::target_from_request( array( 'bsn_gift_age' => 'x', 'bsn_gift_budget' => '500' ) ) );
 		$this->assertNull( GiftFinder::target_from_request( array() ) );
+	}
+
+	/**
+	 * WooCommerce only enables the product archive when a shop page exists at init; emulate that.
+	 */
+	private function enable_product_archive(): void {
+		global $wp_post_types;
+		$wp_post_types['product']->has_archive = 'shop';
+		$wp_post_types['product']->rewrite     = array( 'slug' => 'shop', 'with_front' => false, 'feeds' => true, 'pages' => true, 'ep_mask' => EP_PERMALINK );
+	}
+
+	public function test_url_under_plain_permalinks(): void {
+		$this->enable_product_archive();
+		$this->set_permalink_structure( '' );
+		$url = GiftFinder::url( '4-7', 500 );
+		$q   = $this->parts( $url );
+		$this->assertArrayNotHasKey( 'page_id', $q );
+		$this->assertSame( 'product', $q['post_type'] );
+		$this->assertSame( '4-7', $q['filter_age-group'] );
+		$this->assertSame( 'or', $q['query_type_age-group'] );
+		$this->assertSame( '500', $q['max_price'] );
+	}
+
+	public function test_url_under_pretty_permalinks(): void {
+		$this->enable_product_archive();
+		$this->set_permalink_structure( '/%postname%/' );
+		$url = GiftFinder::url( '4-7', 500 );
+		$this->assertSame( wp_parse_url( get_post_type_archive_link( 'product' ), PHP_URL_PATH ), wp_parse_url( $url, PHP_URL_PATH ) );
+		$q = $this->parts( $url );
+		$this->assertArrayNotHasKey( 'post_type', $q );
+		$this->assertSame( '4-7', $q['filter_age-group'] );
+		$this->assertSame( '500', $q['max_price'] );
 	}
 }

@@ -140,4 +140,16 @@ class SetupCommandTest extends WP_UnitTestCase {
 		$this->assertSame( '111', $this->flat_cost( Shipping::ZONE_VALLEY ) );
 		$this->assertNotSame( 'NPR', get_option( 'woocommerce_currency' ), 'Nothing applied on invalid input.' );
 	}
+
+	public function test_setup_sets_pretty_permalinks_when_plain(): void {
+		$this->set_permalink_structure( '' );
+		( new SetupCommand() )->run( array() );
+		$this->assertSame( '/%postname%/', get_option( 'permalink_structure' ) );
+	}
+
+	public function test_setup_keeps_existing_permalink_structure(): void {
+		$this->set_permalink_structure( '/blog/%postname%/' );
+		( new SetupCommand() )->run( array() );
+		$this->assertSame( '/blog/%postname%/', get_option( 'permalink_structure' ) );
+	}
 }

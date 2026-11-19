@@ -39,13 +39,21 @@ class GiftFinder {
 	}
 
 	/**
+	 * Product archive URL; unlike the shop page permalink it keeps query args under plain permalinks.
+	 */
+	public static function shop_url(): string {
+		$link = get_post_type_archive_link( 'product' );
+		return $link ? $link : wc_get_page_permalink( 'shop' );
+	}
+
+	/**
 	 * Shop URL filtered by age group and optional maximum price.
 	 *
 	 * @param string   $age_slug  Age group term slug.
 	 * @param int|null $max_price Maximum price, or null for any.
 	 */
 	public static function url( string $age_slug, ?int $max_price ): string {
-		$shop = wc_get_page_permalink( 'shop' );
+		$shop = self::shop_url();
 		if ( ! isset( Catalog::ATTRIBUTES['age-group'][1][ $age_slug ] ) ) {
 			return $shop;
 		}

@@ -90,6 +90,12 @@ class SetupCommand {
 		update_option( 'woocommerce_notify_no_stock_amount', 0 );
 		update_option( 'woocommerce_price_num_decimals', 0 );
 
+		if ( '' === (string) get_option( 'permalink_structure' ) ) {
+			global $wp_rewrite;
+			$wp_rewrite->set_permalink_structure( '/%postname%/' );
+			flush_rewrite_rules();
+		}
+
 		$this->enable_cod();
 		$this->ensure_tracking_page();
 
