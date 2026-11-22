@@ -388,6 +388,37 @@ class ThemeTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_template_copy_is_translatable(): void {
+		$theme = dirname( __DIR__, 2 ) . '/themes/bookstore-nepal';
+		$files = array( 'templates/single-product.html', 'parts/footer.html', 'parts/header.html' );
+		$html  = implode( "\n", array_map( static fn( $f ) => (string) file_get_contents( $theme . '/' . $f ), $files ) );
+		foreach ( array( 'About this book', 'Contact us', 'Children', '"prefix":"Ages', 'Search books', 'Search by title' ) as $english ) {
+			$this->assertStringNotContainsString( $english, $html, 'Hard-coded copy belongs in a pattern: ' . $english );
+		}
+
+		$mark   = static fn( $translation, $text, $domain ) => 'bookstore-nepal' === $domain ? '[t]' . $text : $translation;
+		$mark_x  = static fn( $translation, $text, $context, $domain ) => $mark( $translation, $text, $domain );
+		add_filter( 'gettext', $mark, 10, 3 );
+		add_filter( 'gettext_with_context', $mark_x, 10, 4 );
+		$expected = array(
+			'book-chips'             => '"prefix":"[t]Ages "',
+			'book-about'             => '[t]About this book',
+			'footer-about'           => '[t]Children&#039;s books in Nepali and English',
+			'footer-contact-heading' => '[t]Contact us',
+			'header-search'          => '"placeholder":"[t]Search by title, author or topic"',
+		);
+		$rendered = array();
+		foreach ( array_keys( $expected ) as $slug ) {
+			$rendered[ $slug ] = $this->render_pattern( $slug );
+		}
+		remove_filter( 'gettext', $mark, 10 );
+		remove_filter( 'gettext_with_context', $mark_x, 10 );
+		foreach ( $expected as $slug => $needle ) {
+			$this->assertStringContainsString( $needle, $rendered[ $slug ], $slug );
+			$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/' . $slug . '"} /-->', $html, $slug );
+		}
+	}
+
 	public function test_footer_uses_payments_pattern_not_static_copy(): void {
 		$footer = (string) file_get_contents( dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/parts/footer.html' );
 		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/footer-payments"} /-->', $footer );

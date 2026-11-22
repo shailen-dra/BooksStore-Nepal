@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.1';
+	public const VERSION = '0.1.2';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
