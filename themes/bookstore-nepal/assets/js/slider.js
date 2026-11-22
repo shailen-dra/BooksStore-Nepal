@@ -10,9 +10,16 @@
 
 		function update() {
 			var max = row.scrollWidth - row.clientWidth;
+			var active = document.activeElement;
 			prev.hidden = next.hidden = max <= 1;
 			prev.disabled = row.scrollLeft <= 1;
 			next.disabled = row.scrollLeft >= max - 1;
+			// A disabled button cannot hold focus; hand it to the other button.
+			if ( active === prev && prev.disabled && ! next.disabled ) {
+				next.focus();
+			} else if ( active === next && next.disabled && ! prev.disabled ) {
+				prev.focus();
+			}
 		}
 
 		function go( dir ) {

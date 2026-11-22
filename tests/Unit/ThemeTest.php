@@ -649,21 +649,52 @@ class ThemeTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_slider_collection_is_a_labelled_focusable_region(): void {
+	public function test_slider_collection_saved_markup_is_clean(): void {
 		$html = Theme::collection_markup( array( 'query_id' => 1, 'slider' => 'New arrivals' ) );
-		$this->assertStringContainsString( 'bsn-slider', $html );
-		$this->assertStringContainsString( 'id="bsn-slider-1"', $html );
-		$this->assertStringContainsString( 'role="region"', $html );
-		$this->assertStringContainsString( 'aria-label="New arrivals"', $html );
-		$this->assertStringContainsString( 'tabindex="0"', $html );
-		$this->assertSame( 8, json_decode( explode( ' -->', explode( 'wp:woocommerce/product-collection ', $html )[1] )[0], true )['query']['perPage'] );
+		$this->assertStringContainsString( 'bsn-products bsn-slider', $html );
+		$this->assertStringContainsString( '"bsnSliderLabel":"New arrivals"', $html );
+		$this->assertDoesNotMatchRegularExpression( '/role=|aria-label=|tabindex|id="/', $html );
+		$this->assertStringNotContainsString( '  ', explode( "\n", $html )[1] );
 	}
 
 	public function test_plain_collection_is_not_a_slider(): void {
 		$html = Theme::collection_markup( array( 'query_id' => 2 ) );
 		$this->assertStringNotContainsString( 'bsn-slider', $html );
-		$this->assertStringNotContainsString( 'role="region"', $html );
-		$this->assertStringNotContainsString( 'tabindex', $html );
+		$this->assertStringNotContainsString( 'bsnSliderLabel', $html );
+	}
+
+	public function test_render_filter_adds_region_attributes_to_sliders_only(): void {
+		$html = '<div class="wp-block-woocommerce-product-collection alignwide bsn-products bsn-slider"><ul><li>x</li></ul></div>';
+		$out  = Theme::filter_slider_region( $html, array( 'attrs' => array( 'queryId' => 4, 'bsnSliderLabel' => 'Best "sellers" <b>' ) ) );
+		$this->assertStringContainsString( 'id="bsn-slider-4"', $out );
+		$this->assertStringContainsString( 'role="region"', $out );
+		$this->assertStringContainsString( 'tabindex="0"', $out );
+		$this->assertStringContainsString( 'aria-label="Best &quot;sellers&quot; &lt;b&gt;"', $out );
+		$this->assertStringContainsString( '<ul><li>x</li></ul>', $out );
+
+		$plain = '<div class="wp-block-woocommerce-product-collection bsn-products"><ul></ul></div>';
+		$this->assertSame( $plain, Theme::filter_slider_region( $plain, array( 'attrs' => array( 'queryId' => 2 ) ) ) );
+		$this->assertSame( $html, Theme::filter_slider_region( $html, array( 'attrs' => array( 'queryId' => 4 ) ) ), 'No label, no region.' );
+	}
+
+	public function test_render_filter_is_hooked(): void {
+		Theme::register();
+		$this->assertNotFalse( has_filter( 'render_block_woocommerce/product-collection', array( Theme::class, 'filter_slider_region' ) ) );
+	}
+
+	public function test_slider_script_loads_on_front_page_only(): void {
+		$front   = self::factory()->post->create( array( 'post_type' => 'page' ) );
+		$product = self::factory()->post->create( array( 'post_type' => 'product' ) );
+		update_option( 'show_on_front', 'page' );
+		update_option( 'page_on_front', $front );
+		wp_dequeue_script( 'bsn-slider' );
+		$this->go_to( get_permalink( $front ) );
+		Theme::enqueue();
+		$this->assertTrue( wp_script_is( 'bsn-slider', 'enqueued' ) );
+		wp_dequeue_script( 'bsn-slider' );
+		$this->go_to( get_permalink( $product ) );
+		Theme::enqueue();
+		$this->assertFalse( wp_script_is( 'bsn-slider', 'enqueued' ) );
 	}
 
 	public function test_slider_controls_are_hidden_labelled_buttons_for_the_row(): void {
@@ -681,8 +712,8 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertSame( 'bsn-slider-1', Theme::slider_id( 1 ) );
 		foreach ( array( 'new-arrivals' => 'New arrivals', 'best-sellers' => 'Best sellers' ) as $slug => $label ) {
 			$html = $this->render_pattern( $slug );
-			$this->assertStringContainsString( 'role="region"', $html, $slug );
-			$this->assertStringContainsString( 'aria-label="' . $label . '"', $html, $slug );
+			$this->assertStringContainsString( '"bsnSliderLabel":"' . $label . '"', $html, $slug );
+			$this->assertDoesNotMatchRegularExpression( '/role=|tabindex/', $html, $slug );
 			$this->assertStringContainsString( 'data-bsn-slider-next', $html, $slug );
 		}
 		$this->assertStringNotContainsString( 'bsn-slider', $this->render_pattern( 'featured-books' ) );

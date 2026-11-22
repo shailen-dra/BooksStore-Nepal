@@ -11,6 +11,8 @@
 use BookstoreNepal\Theme\Theme;
 
 defined( 'ABSPATH' ) || exit;
+
+$bsn_query_id = 4;
 ?>
 <!-- wp:group {"align":"wide","className":"bsn-section bsn-best","layout":{"type":"default"}} -->
 <div class="wp-block-group alignwide bsn-section bsn-best"><!-- wp:group {"className":"bsn-section__head","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between","verticalAlignment":"bottom"}} -->
@@ -26,7 +28,7 @@ defined( 'ABSPATH' ) || exit;
 <!-- wp:html -->
 <?php
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markup built and escaped by Theme.
-echo Theme::slider_controls( Theme::slider_id( 4 ) );
+echo Theme::slider_controls( Theme::slider_id( $bsn_query_id ) );
 ?>
 <!-- /wp:html --></div>
 <!-- /wp:group --></div>
@@ -36,7 +38,7 @@ echo Theme::slider_controls( Theme::slider_id( 4 ) );
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Block markup built and escaped by Theme.
 echo Theme::collection_markup(
 	array(
-		'query_id' => 4,
+		'query_id' => $bsn_query_id,
 		'slider'   => __( 'Best sellers', 'bookstore-nepal' ),
 		'query'    => array(
 			'orderBy'                => 'popularity',

@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.4';
+	public const VERSION = '0.1.5';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -62,6 +62,7 @@ final class Theme {
 		add_action( 'wp', array( self::class, 'relocate_book_details' ) );
 		add_action( 'after_switch_theme', array( self::class, 'ensure_front_page' ) );
 		add_filter( 'render_block_woocommerce/product-image', array( self::class, 'filter_product_image' ), 10, 3 );
+		add_filter( 'render_block_woocommerce/product-collection', array( self::class, 'filter_slider_region' ), 10, 2 );
 		add_filter( 'render_block_core/post-terms', array( self::class, 'filter_plain_terms' ), 10, 2 );
 		add_filter( 'render_block_core/group', array( self::class, 'filter_details_slot' ), 10, 2 );
 		// Templates run do_shortcode before do_blocks, so shortcode blocks inside patterns need their own pass.
@@ -88,6 +89,31 @@ final class Theme {
 	 */
 	public static function slider_id( int $query_id ): string {
 		return 'bsn-slider-' . $query_id;
+	}
+
+	/**
+	 * Makes a slider's scrolling row a labelled, focusable region at render time.
+	 *
+	 * The attributes are not part of the block's saved markup, so the editor does not flag them.
+	 *
+	 * @param string $html  Rendered block.
+	 * @param array  $block Parsed block.
+	 */
+	public static function filter_slider_region( $html, $block = array() ): string {
+		$html  = (string) $html;
+		$label = isset( $block['attrs']['bsnSliderLabel'] ) ? (string) $block['attrs']['bsnSliderLabel'] : '';
+		if ( '' === $label || ! str_contains( $html, 'bsn-slider' ) ) {
+			return $html;
+		}
+		$tags = new \WP_HTML_Tag_Processor( $html );
+		if ( ! $tags->next_tag( array( 'class_name' => 'bsn-slider' ) ) ) {
+			return $html;
+		}
+		$tags->set_attribute( 'id', self::slider_id( (int) ( $block['attrs']['queryId'] ?? 0 ) ) );
+		$tags->set_attribute( 'role', 'region' );
+		$tags->set_attribute( 'aria-label', $label );
+		$tags->set_attribute( 'tabindex', '0' );
+		return $tags->get_updated_html();
 	}
 
 	/**
@@ -748,7 +774,7 @@ final class Theme {
 	 *     @type int    $heading_level Card title heading level.
 	 *     @type bool   $pagination    Whether to render pagination and the no-results message.
 	 *     @type string $class         Extra class.
-	 *     @type string $slider        Accessible name; when set the row is a horizontal slider.
+	 *     @type string $slider        Accessible name; when set the row is a horizontal slider (region attributes are added at render time).
 	 * }
 	 */
 	public static function collection_markup( array $args ): string {
@@ -785,11 +811,7 @@ final class Theme {
 			),
 			$args['query']
 		);
-		$class = trim( 'bsn-products ' . $args['class'] . ( '' !== $args['slider'] ? ' bsn-slider' : '' ) );
-		$wrap  = '';
-		if ( '' !== $args['slider'] ) {
-			$wrap = ' id="' . esc_attr( self::slider_id( (int) $args['query_id'] ) ) . '" role="region" aria-label="' . esc_attr( $args['slider'] ) . '" tabindex="0"';
-		}
+		$class = implode( ' ', array_filter( array( 'bsn-products', $args['class'], '' !== $args['slider'] ? 'bsn-slider' : '' ) ) );
 		$attrs = array(
 			'queryId'              => (int) $args['query_id'],
 			'query'                => $query,
@@ -804,6 +826,9 @@ final class Theme {
 			'align'                => 'wide',
 			'className'            => $class,
 		);
+		if ( '' !== $args['slider'] ) {
+			$attrs['bsnSliderLabel'] = (string) $args['slider'];
+		}
 		if ( '' !== $args['collection'] ) {
 			$attrs['collection'] = $args['collection'];
 		}
@@ -826,7 +851,7 @@ final class Theme {
 		}
 
 		return '<!-- wp:woocommerce/product-collection ' . serialize_block_attributes( $attrs ) . ' -->
-<div class="wp-block-woocommerce-product-collection alignwide ' . esc_attr( $class ) . '"' . $wrap . '>' . $inner . '</div>
+<div class="wp-block-woocommerce-product-collection alignwide ' . esc_attr( $class ) . '">' . $inner . '</div>
 <!-- /wp:woocommerce/product-collection -->';
 	}
 }
