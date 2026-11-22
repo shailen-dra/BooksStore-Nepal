@@ -117,4 +117,21 @@ class ShippingTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'free_shipping', $this->costs( $this->rates_for( 'NP-D-KASKI', 2500 ) ) );
 		$this->assertArrayHasKey( 'free_shipping', $this->costs( $this->rates_for( 'NP-D-KASKI', 3000 ) ) );
 	}
+
+	public function test_free_delivery_hides_other_rates(): void {
+		$rates = array(
+			'flat_rate:1'     => new WC_Shipping_Rate( 'flat_rate:1', 'Delivery', 100, array(), 'flat_rate' ),
+			'free_shipping:2' => new WC_Shipping_Rate( 'free_shipping:2', 'Free delivery', 0, array(), 'free_shipping' ),
+		);
+		$result = Shipping::hide_paid_rates_when_free( $rates );
+		$this->assertSame( array( 'free_shipping:2' ), array_keys( $result ) );
+		$this->assertSame( array( 'free_shipping:2' ), array_keys( apply_filters( 'woocommerce_package_rates', $rates, array() ) ) );
+	}
+
+	public function test_rates_without_free_delivery_are_unchanged(): void {
+		$rates = array(
+			'flat_rate:1' => new WC_Shipping_Rate( 'flat_rate:1', 'Delivery', 100, array(), 'flat_rate' ),
+		);
+		$this->assertSame( $rates, Shipping::hide_paid_rates_when_free( $rates ) );
+	}
 }

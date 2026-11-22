@@ -23,7 +23,27 @@ class Shipping {
 	public static function register(): void {
 		add_filter( 'woocommerce_states', array( self::class, 'states' ) );
 		add_filter( 'woocommerce_get_country_locale', array( self::class, 'locale' ) );
+		add_filter( 'woocommerce_package_rates', array( self::class, 'hide_paid_rates_when_free' ) );
 		add_action( 'woocommerce_after_checkout_validation', array( self::class, 'validate_checkout' ), 10, 2 );
+	}
+
+	/**
+	 * When free delivery applies, offers only that rate so customers are not shown (or defaulted to) a paid one.
+	 *
+	 * @param array $rates Rate id => WC_Shipping_Rate.
+	 * @return array
+	 */
+	public static function hide_paid_rates_when_free( $rates ) {
+		if ( ! is_array( $rates ) ) {
+			return $rates;
+		}
+		$free = array();
+		foreach ( $rates as $id => $rate ) {
+			if ( $rate instanceof \WC_Shipping_Rate && 'free_shipping' === $rate->get_method_id() ) {
+				$free[ $id ] = $rate;
+			}
+		}
+		return $free ? $free : $rates;
 	}
 
 	/**
