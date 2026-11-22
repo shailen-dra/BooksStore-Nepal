@@ -13,6 +13,7 @@ Contents:
 5. [Create a discount code](#5-create-a-discount-code)
 6. [Change the featured books on the home page](#6-change-the-featured-books-on-the-home-page)
 7. [Change delivery rates](#7-change-delivery-rates)
+8. [Shop information pages](#8-shop-information-pages)
 
 ---
 
@@ -174,6 +175,29 @@ Always check the result by adding a book to the cart on your website and going t
 When an order qualifies for free delivery, the checkout offers **Free delivery** and hides the paid **Delivery** option. Any other option you add to the zone, such as local pickup, still shows. Orders below the amount see the paid **Delivery** price instead.
 
 ![Shipping zones](admin-guide/07-shipping.png)
+
+## 8. Shop information pages
+
+Your shop has seven information pages: **About us**, **Contact us**, **Delivery information**, **Returns & refunds**, **Privacy policy**, **Terms & conditions** and **Frequently asked questions**. The footer links to them, and the checkout links to the Terms page.
+
+**Contact details.** Your phone, WhatsApp number, email and address are entered once and shown on the Contact page and in the footer.
+
+1. Go to **WooCommerce › Settings › General**.
+2. Fill in the **Store address** (street, city, district).
+3. Just below it, fill in **Shop phone**, **WhatsApp number** (digits only, with the country code, for example `97798XXXXXXXX`) and **Contact email**. If you leave the email empty, the site administrator email is shown.
+4. Click **Save changes**.
+
+Anything you have not filled in shows as a bracketed `[CLIENT ...]` note, so gaps are easy to spot. Search your live site for "CLIENT" before you launch.
+
+**Changing the wording.** Each page's text comes from the theme, so it is translatable and the delivery charges stay up to date by themselves. To rewrite a page:
+
+1. Go to **Pages** and open the page.
+2. Click the text once, then click the three-dot menu in the block toolbar and choose **Detach**. (The page is a single "pattern" block.)
+3. Edit the text like any other page and click **Update**.
+
+A detached page no longer follows theme updates. On the Delivery page the live charges are a separate block, so they keep updating after you detach the page: leave that block in place. Pages you have published or edited are never overwritten when `wp bsn setup` is run again.
+
+**Review before launch.** The Privacy policy, Terms & conditions and Returns & refunds pages are drafts of ordinary wording, not legal advice. Fill in every `[CLIENT ...]` item (return period, refund timing, VAT, how long you keep records) and have them read by the shop owner and, ideally, a lawyer before the shop goes live.
 
 ---
 
