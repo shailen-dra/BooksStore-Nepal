@@ -93,6 +93,8 @@ To check it is working, open **WooCommerce › Status › Scheduled Actions**, s
 
 Test mode is on by default. Check this setting before launch and after any restore of a staging database onto the live site.
 
+**Switching a live shop back to test mode** (eSewa or Khalti) holds every unpaid order that has a live payment attempt: the sandbox cannot check real payments, so these orders are not completed or cancelled automatically. Each gets a note ("eSewa payment started in live mode — check the live merchant portal" / "Khalti payment started in live mode — check the Khalti merchant dashboard"). Check them by hand in the live merchant portal, or switch back to live mode, where they are checked again as usual. Test-mode attempts seen from live mode are never real money and do not hold an order.
+
 ### Khalti
 
 Khalti (Web Checkout, KPG-2) is a gateway in our plugin, shown in the block checkout like eSewa. Customers are sent to Khalti to pay; the order is marked paid only after Khalti's lookup API confirms the payment for the exact order total.
