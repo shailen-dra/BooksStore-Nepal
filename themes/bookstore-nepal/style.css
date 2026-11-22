@@ -125,6 +125,7 @@ body {
 }
 
 .bsn-brand__text { gap: 0; }
+.bsn-brand .wp-block-site-title a { display: inline-flex; align-items: center; min-height: var(--bsn-tap); }
 .bsn-brand__text > * { margin: 0; }
 
 .bsn-search .wp-block-search__inside-wrapper {
@@ -179,6 +180,7 @@ body {
 .bsn-nav .wp-block-navigation-item__content {
 	display: inline-flex;
 	align-items: center;
+	min-width: var(--bsn-tap);
 	min-height: var(--bsn-tap);
 	text-decoration: none;
 }
@@ -342,7 +344,7 @@ body {
 }
 
 .bsn-card__title { font-size: 19px !important; line-height: 1.3; }
-.bsn-card__title a { display: inline-block; padding: 6px 0; }
+.bsn-card__title a { display: inline-flex; align-items: center; min-height: var(--bsn-tap); }
 
 .bsn-card__meta {
 	display: flex;
@@ -496,7 +498,7 @@ body {
 	color: var(--wp--custom--color--subtle);
 }
 
-.bsn-breadcrumbs a { display: inline-flex; align-items: center; min-height: var(--bsn-tap); }
+.bsn-breadcrumbs a { display: inline-flex; align-items: center; justify-content: center; min-width: var(--bsn-tap); min-height: var(--bsn-tap); }
 
 .bsn-filters {
 	display: flex;
