@@ -19,7 +19,7 @@ if ( isset( $bsn_methods['esewa'] ) ) {
 	$bsn_pay[] = array( 'p', __( 'Pay online with eSewa when you check out. You are taken to eSewa to pay, and we never see your eSewa PIN or password.', 'bookstore-nepal' ) );
 }
 if ( isset( $bsn_methods['cod'] ) ) {
-	$bsn_pay[] = array( 'p', __( 'Or choose cash on delivery and pay the rider in cash when your books arrive. Please keep the amount ready and keep your phone nearby: the rider calls before arriving.', 'bookstore-nepal' ) );
+	$bsn_pay[] = array( 'p', __( 'Or choose cash on delivery and pay the rider in cash when your books arrive. Please keep the amount ready and your phone nearby so the rider can reach you.', 'bookstore-nepal' ) );
 }
 ?>
 <!-- wp:group {"className":"bsn-info","layout":{"type":"constrained"}} -->

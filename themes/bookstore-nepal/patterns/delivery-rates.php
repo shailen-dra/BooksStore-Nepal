@@ -22,7 +22,7 @@ $bsn_rates = Theme::delivery_rates();
 <!-- /wp:list-item --><?php endif; ?><?php if ( null !== $bsn_rates['rest'] ) : ?><!-- wp:list-item -->
 <li><?php echo esc_html( sprintf( /* translators: %s: delivery charge, e.g. NPR 200. */ __( 'Everywhere else in Nepal (the other 74 districts): %s', 'bookstore-nepal' ), Theme::npr( $bsn_rates['rest'] ) ) ); ?></li>
 <!-- /wp:list-item --><?php endif; ?><?php if ( null !== $bsn_rates['free_over'] ) : ?><!-- wp:list-item -->
-<li><?php echo esc_html( sprintf( /* translators: %s: order total, e.g. NPR 2,000. */ __( 'Free delivery anywhere in Nepal on orders over %s', 'bookstore-nepal' ), Theme::npr( $bsn_rates['free_over'] ) ) ); ?></li>
+<li><?php echo esc_html( sprintf( /* translators: %s: order total, e.g. NPR 2,000. */ __( 'Free delivery anywhere in Nepal on orders of %s or more', 'bookstore-nepal' ), Theme::npr( $bsn_rates['free_over'] ) ) ); ?></li>
 <!-- /wp:list-item --><?php endif; ?></ul>
 <!-- /wp:list --></section>
 <!-- /wp:group -->

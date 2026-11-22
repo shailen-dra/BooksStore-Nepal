@@ -184,7 +184,7 @@ Your shop has seven information pages: **About us**, **Contact us**, **Delivery 
 
 1. Go to **WooCommerce › Settings › General**.
 2. Fill in the **Store address** (street, city, district).
-3. Just below it, fill in **Shop phone**, **WhatsApp number** (digits only, with the country code, for example `97798XXXXXXXX`) and **Contact email**. If you leave the email empty, the site administrator email is shown.
+3. Just below it, fill in **Shop phone**, **WhatsApp number** (a Nepali mobile such as `9812345678`; the 977 country code is added for you) and **Contact email**. The WordPress administrator email is never shown to customers; until you fill in the contact email, the footer shows a placeholder.
 4. Click **Save changes**.
 
 Anything you have not filled in shows as a bracketed `[CLIENT ...]` note, so gaps are easy to spot. Search your live site for "CLIENT" before you launch.

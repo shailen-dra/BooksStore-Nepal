@@ -87,4 +87,4 @@ vendor/bin/phpunit
 
 ## Open items from the client
 
-Shop name and logo, domain, eSewa and Khalti merchant accounts, real delivery rates (the plan uses placeholders: Valley NPR 100, rest of Nepal NPR 200, free over NPR 2,000), courier partner, return policy, first 20–30 books. See the proposal's "Next steps" section.
+Shop name and logo, domain, eSewa and Khalti merchant accounts, real delivery rates (the plan uses placeholders: Valley NPR 100, rest of Nepal NPR 200, free on orders of NPR 2,000 or more), courier partner, return policy, first 20–30 books. See the proposal's "Next steps" section.

@@ -21,7 +21,6 @@ class ThemeTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		remove_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
-		remove_filter( 'pre_option_admin_email', '__return_empty_string' );
 		unset( $GLOBALS['product'] );
 		Theme::flush_rates();
 		$this->restore_shortcodes();
@@ -453,14 +452,14 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertSame( '<a href="' . esc_url( get_permalink( $page ) ) . '">FAQ</a>', Theme::page_link( 'faq', 'FAQ' ) );
 	}
 
-	public function test_contact_details_empty_by_default_apart_from_admin_email(): void {
+	public function test_contact_details_empty_by_default_including_email(): void {
 		foreach ( array( 'bsn_shop_phone', 'bsn_shop_whatsapp', 'bsn_shop_email', 'woocommerce_store_address', 'woocommerce_store_address_2', 'woocommerce_store_city', 'woocommerce_store_postcode' ) as $option ) {
 			delete_option( $option );
 		}
 		$details = Theme::contact_details();
 		$this->assertSame( '', $details['phone'] );
 		$this->assertSame( '', $details['whatsapp'] );
-		$this->assertSame( get_option( 'admin_email' ), $details['email'] );
+		$this->assertSame( '', $details['email'] );
 		$this->assertSame( array(), $details['address'] );
 	}
 
@@ -506,15 +505,13 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<summary>Why?</summary>', $html );
 		$this->assertStringNotContainsString( 'onclick', $html );
 		$this->assertStringContainsString( 'bsn-placeholder', $html );
-		$this->assertCount( 5, parse_blocks( $html ) > 0 ? array_filter( parse_blocks( $html ), static fn( $b ) => null !== $b['blockName'] ) : array() );
+		$this->assertCount( 5, array_filter( parse_blocks( $html ), static fn( $b ) => null !== $b['blockName'] ) );
 	}
 
 	private function clear_contact_options(): void {
 		foreach ( array( 'bsn_shop_phone', 'bsn_shop_whatsapp', 'bsn_shop_email', 'woocommerce_store_address', 'woocommerce_store_address_2', 'woocommerce_store_city', 'woocommerce_store_postcode' ) as $option ) {
 			delete_option( $option );
 		}
-		// WordPress refuses to save an empty admin email, so blank it for this test only.
-		add_filter( 'pre_option_admin_email', '__return_empty_string' );
 	}
 
 	public function test_contact_details_pattern_shows_placeholders_for_what_is_missing(): void {
@@ -544,6 +541,19 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertCount( 4, array_filter( parse_blocks( $html ), static fn( $b ) => 'core/paragraph' === $b['blockName'] ) );
 	}
 
+	public function test_admin_email_is_never_published_as_the_contact_email(): void {
+		$this->clear_contact_options();
+		$this->assertStringNotContainsString( get_option( 'admin_email' ), $this->render_pattern( 'contact-details' ) );
+	}
+
+	public function test_whatsapp_link_needs_a_valid_number(): void {
+		$this->clear_contact_options();
+		update_option( 'bsn_shop_whatsapp', '98123' );
+		$html = $this->render_pattern( 'contact-details' );
+		$this->assertStringNotContainsString( 'wa.me', $html );
+		$this->assertStringContainsString( '[CLIENT WHATSAPP', $html );
+	}
+
 	public function test_contact_details_pattern_mixes_placeholder_and_value(): void {
 		$this->clear_contact_options();
 		update_option( 'bsn_shop_whatsapp', '9779812345678' );
@@ -559,7 +569,7 @@ class ThemeTest extends WP_UnitTestCase {
 		$html = $this->render_pattern( 'delivery-rates' );
 		$this->assertStringContainsString( 'Kathmandu Valley (Kathmandu, Lalitpur and Bhaktapur): NPR 120', $html );
 		$this->assertStringContainsString( 'other 74 districts): NPR 250', $html );
-		$this->assertStringContainsString( 'orders over NPR 3,000', $html );
+		$this->assertStringContainsString( 'orders of NPR 3,000 or more', $html );
 	}
 
 	public function test_every_page_pattern_renders_valid_blocks_with_h2s_and_no_h1(): void {
@@ -620,5 +630,22 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/contact-details"} /-->', $footer );
 		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/footer-legal"} /-->', $footer );
 		$this->assertStringNotContainsString( 'CLIENT', $footer );
+	}
+
+	public function test_pages_do_not_promise_that_the_rider_calls(): void {
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'no' );
+		foreach ( array( 'page-delivery', 'page-faq', 'page-privacy' ) as $slug ) {
+			$this->assertDoesNotMatchRegularExpression( '/rider calls|riders may phone|calls before/i', $this->render_pattern( $slug ), $slug );
+		}
+	}
+
+	public function test_free_delivery_wording_is_inclusive(): void {
+		Shipping::install( array( 'valley' => 120, 'rest' => 250, 'free_over' => 3000 ) );
+		Theme::flush_rates();
+		foreach ( array( 'book-delivery', 'delivery-rates', 'page-faq' ) as $slug ) {
+			$html = $this->render_pattern( $slug );
+			$this->assertStringContainsString( 'NPR 3,000 or more', $html, $slug );
+			$this->assertStringNotContainsString( 'orders over', $html, $slug );
+		}
 	}
 }

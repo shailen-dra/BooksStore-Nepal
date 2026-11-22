@@ -35,7 +35,7 @@ echo Theme::blocks( // phpcs:ignore WordPress.Security.EscapeOutput -- escaped i
 			'ul',
 			array(
 				esc_html__( 'To prepare, deliver and take payment for your order.', 'bookstore-nepal' ),
-				esc_html__( 'To contact you about your order. Our riders may phone you before they arrive.', 'bookstore-nepal' ),
+				esc_html__( 'To contact you about your order, and so the rider can reach you about your delivery.', 'bookstore-nepal' ),
 				esc_html__( 'To handle returns and refunds, and to answer your questions.', 'bookstore-nepal' ),
 				esc_html__( 'To keep the business records we need, for example for accounts and tax.', 'bookstore-nepal' ),
 			),

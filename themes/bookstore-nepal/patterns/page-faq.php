@@ -28,7 +28,7 @@ if ( null !== $bsn_rates['valley'] && null !== $bsn_rates['rest'] ) {
 		esc_html__( 'Delivery is %1$s inside Kathmandu Valley and %2$s in the rest of Nepal.%3$s Delivery times are on our %4$s page.', 'bookstore-nepal' ),
 		esc_html( Theme::npr( $bsn_rates['valley'] ) ),
 		esc_html( Theme::npr( $bsn_rates['rest'] ) ),
-		null === $bsn_rates['free_over'] ? '' : ' ' . esc_html( sprintf( /* translators: %s: order total, e.g. NPR 2,000. */ __( 'It is free on orders over %s.', 'bookstore-nepal' ), Theme::npr( $bsn_rates['free_over'] ) ) ),
+		null === $bsn_rates['free_over'] ? '' : ' ' . esc_html( sprintf( /* translators: %s: order total, e.g. NPR 2,000. */ __( 'It is free on orders of %s or more.', 'bookstore-nepal' ), Theme::npr( $bsn_rates['free_over'] ) ) ),
 		$bsn_link['delivery']
 	);
 } else {
@@ -41,7 +41,7 @@ $bsn_ordering = array(
 	array( 'qa', __( 'How much does delivery cost, and how long does it take?', 'bookstore-nepal' ), $bsn_cost ),
 );
 if ( isset( $bsn_methods['cod'] ) ) {
-	$bsn_ordering[] = array( 'qa', __( 'Can I pay when the books arrive?', 'bookstore-nepal' ), esc_html__( 'Yes. Choose cash on delivery at checkout and pay the rider in cash when your books arrive. Please keep your phone nearby, because the rider calls before arriving.', 'bookstore-nepal' ) );
+	$bsn_ordering[] = array( 'qa', __( 'Can I pay when the books arrive?', 'bookstore-nepal' ), esc_html__( 'Yes. Choose cash on delivery at checkout and pay the rider in cash when your books arrive. Please keep your phone nearby so the rider can reach you.', 'bookstore-nepal' ) );
 }
 if ( isset( $bsn_methods['esewa'] ) ) {
 	$bsn_ordering[] = array( 'qa', __( 'How does paying with eSewa work?', 'bookstore-nepal' ), esc_html__( 'Choose eSewa at checkout and place your order. You are taken to eSewa to approve the payment, then brought back to our shop with your confirmation. We never see your eSewa PIN or password. If eSewa charged you but you did not see a confirmation, message us with your phone number and we will check.', 'bookstore-nepal' ) );
