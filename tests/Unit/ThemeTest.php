@@ -21,6 +21,7 @@ class ThemeTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		remove_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
+		remove_filter( 'pre_option_admin_email', '__return_empty_string' );
 		unset( $GLOBALS['product'] );
 		Theme::flush_rates();
 		$this->restore_shortcodes();
@@ -431,5 +432,193 @@ class ThemeTest extends WP_UnitTestCase {
 		$footer = (string) file_get_contents( dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/parts/footer.html' );
 		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/footer-payments"} /-->', $footer );
 		$this->assertStringNotContainsString( 'Khalti', $footer );
+	}
+
+	public function test_page_url_only_for_published_page_and_known_key(): void {
+		$page = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'draft' ) );
+		update_option( 'woocommerce_terms_page_id', $page );
+		$this->assertNull( Theme::page_url( 'terms' ) );
+		wp_publish_post( $page );
+		$this->assertSame( get_permalink( $page ), Theme::page_url( 'terms' ) );
+		$this->assertNull( Theme::page_url( 'nonsense' ) );
+		delete_option( 'bsn_page_faq' );
+		$this->assertNull( Theme::page_url( 'faq' ) );
+	}
+
+	public function test_page_link_falls_back_to_plain_text(): void {
+		delete_option( 'bsn_page_faq' );
+		$this->assertSame( 'FAQ &amp; help', Theme::page_link( 'faq', 'FAQ & help' ) );
+		$page = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+		update_option( 'bsn_page_faq', $page );
+		$this->assertSame( '<a href="' . esc_url( get_permalink( $page ) ) . '">FAQ</a>', Theme::page_link( 'faq', 'FAQ' ) );
+	}
+
+	public function test_contact_details_empty_by_default_apart_from_admin_email(): void {
+		foreach ( array( 'bsn_shop_phone', 'bsn_shop_whatsapp', 'bsn_shop_email', 'woocommerce_store_address', 'woocommerce_store_address_2', 'woocommerce_store_city', 'woocommerce_store_postcode' ) as $option ) {
+			delete_option( $option );
+		}
+		$details = Theme::contact_details();
+		$this->assertSame( '', $details['phone'] );
+		$this->assertSame( '', $details['whatsapp'] );
+		$this->assertSame( get_option( 'admin_email' ), $details['email'] );
+		$this->assertSame( array(), $details['address'] );
+	}
+
+	public function test_contact_details_use_settings_and_build_the_address(): void {
+		update_option( 'bsn_shop_phone', '01 4123456' );
+		update_option( 'bsn_shop_whatsapp', '+977 98-1234-5678' );
+		update_option( 'bsn_shop_email', 'hello@example.com' );
+		update_option( 'woocommerce_store_address', 'Pulchowk Road' );
+		update_option( 'woocommerce_store_address_2', '' );
+		update_option( 'woocommerce_store_city', 'Lalitpur' );
+		update_option( 'woocommerce_store_postcode', '44700' );
+		update_option( 'woocommerce_default_country', 'NP:NP-D-LALITPUR' );
+		$details = Theme::contact_details();
+		$this->assertSame( '01 4123456', $details['phone'] );
+		$this->assertSame( '9779812345678', $details['whatsapp'] );
+		$this->assertSame( 'hello@example.com', $details['email'] );
+		$this->assertSame( 'Pulchowk Road', $details['address'][0] );
+		$this->assertSame( 'Lalitpur 44700', $details['address'][1] );
+		$this->assertContains( 'Nepal', $details['address'] );
+		$this->assertCount( 4, $details['address'] );
+	}
+
+	public function test_country_alone_is_not_an_address(): void {
+		update_option( 'woocommerce_default_country', 'NP:NP-D-KATHMANDU' );
+		update_option( 'woocommerce_store_address', '' );
+		update_option( 'woocommerce_store_city', '' );
+		$this->assertSame( array(), Theme::contact_details()['address'] );
+	}
+
+	public function test_blocks_escape_text_and_build_core_blocks(): void {
+		$html = Theme::blocks(
+			array(
+				array( 'h2', 'Fish & <b>chips</b>' ),
+				array( 'p', '<script>x</script>' ),
+				array( 'ul', array( 'One', 'Two' ) ),
+				array( 'qa', 'Why?', 'Because <a href="/x" onclick="y()">so</a>' ),
+				array( 'note', '[CLIENT: fill in]' ),
+			)
+		);
+		$this->assertStringContainsString( '<h2 class="wp-block-heading">Fish &amp; &lt;b&gt;chips&lt;/b&gt;</h2>', $html );
+		$this->assertStringNotContainsString( '<script>', $html );
+		$this->assertStringContainsString( '<!-- wp:list-item --><li>One</li>', $html );
+		$this->assertStringContainsString( '<summary>Why?</summary>', $html );
+		$this->assertStringNotContainsString( 'onclick', $html );
+		$this->assertStringContainsString( 'bsn-placeholder', $html );
+		$this->assertCount( 5, parse_blocks( $html ) > 0 ? array_filter( parse_blocks( $html ), static fn( $b ) => null !== $b['blockName'] ) : array() );
+	}
+
+	private function clear_contact_options(): void {
+		foreach ( array( 'bsn_shop_phone', 'bsn_shop_whatsapp', 'bsn_shop_email', 'woocommerce_store_address', 'woocommerce_store_address_2', 'woocommerce_store_city', 'woocommerce_store_postcode' ) as $option ) {
+			delete_option( $option );
+		}
+		// WordPress refuses to save an empty admin email, so blank it for this test only.
+		add_filter( 'pre_option_admin_email', '__return_empty_string' );
+	}
+
+	public function test_contact_details_pattern_shows_placeholders_for_what_is_missing(): void {
+		$this->clear_contact_options();
+		$html = $this->render_pattern( 'contact-details' );
+		$this->assertStringContainsString( '[CLIENT PHONE', $html );
+		$this->assertStringContainsString( '[CLIENT WHATSAPP', $html );
+		$this->assertStringContainsString( '[CLIENT EMAIL', $html );
+		$this->assertStringContainsString( '[CLIENT SHOP ADDRESS', $html );
+		$this->assertStringNotContainsString( 'href=', $html );
+	}
+
+	public function test_contact_details_pattern_links_and_escapes_what_is_set(): void {
+		$this->clear_contact_options();
+		update_option( 'bsn_shop_phone', '+977 1 4123456' );
+		update_option( 'bsn_shop_whatsapp', '9779812345678' );
+		update_option( 'bsn_shop_email', 'hello@example.com' );
+		update_option( 'woocommerce_store_address', 'Pulchowk <script>x</script> Road' );
+		update_option( 'woocommerce_store_city', 'Lalitpur' );
+		$html = $this->render_pattern( 'contact-details' );
+		$this->assertStringContainsString( '<a href="tel:+97714123456">+977 1 4123456</a>', $html );
+		$this->assertStringContainsString( 'href="https://wa.me/9779812345678">Chat on WhatsApp</a>', $html );
+		$this->assertStringContainsString( '<a href="mailto:hello@example.com">hello@example.com</a>', $html );
+		$this->assertStringContainsString( 'Pulchowk &lt;script&gt;x&lt;/script&gt; Road<br>Lalitpur', $html );
+		$this->assertStringNotContainsString( '<script>', $html );
+		$this->assertStringNotContainsString( '[CLIENT', $html );
+		$this->assertCount( 4, array_filter( parse_blocks( $html ), static fn( $b ) => 'core/paragraph' === $b['blockName'] ) );
+	}
+
+	public function test_contact_details_pattern_mixes_placeholder_and_value(): void {
+		$this->clear_contact_options();
+		update_option( 'bsn_shop_whatsapp', '9779812345678' );
+		$html = $this->render_pattern( 'contact-details' );
+		$this->assertStringContainsString( 'wa.me/9779812345678', $html );
+		$this->assertStringContainsString( '[CLIENT PHONE', $html );
+		$this->assertStringNotContainsString( '[CLIENT WHATSAPP', $html );
+	}
+
+	public function test_delivery_rates_pattern_shows_live_rates(): void {
+		Shipping::install( array( 'valley' => 120, 'rest' => 250, 'free_over' => 3000 ) );
+		Theme::flush_rates();
+		$html = $this->render_pattern( 'delivery-rates' );
+		$this->assertStringContainsString( 'Kathmandu Valley (Kathmandu, Lalitpur and Bhaktapur): NPR 120', $html );
+		$this->assertStringContainsString( 'other 74 districts): NPR 250', $html );
+		$this->assertStringContainsString( 'orders over NPR 3,000', $html );
+	}
+
+	public function test_every_page_pattern_renders_valid_blocks_with_h2s_and_no_h1(): void {
+		foreach ( array( 'about', 'contact', 'delivery', 'returns', 'privacy', 'terms', 'faq' ) as $key ) {
+			$html = $this->render_pattern( 'page-' . $key );
+			$this->assertStringNotContainsString( '<h1', $html, $key );
+			$this->assertGreaterThanOrEqual( 3, substr_count( $html, '<h2 ' ), $key );
+			$this->assertStringNotContainsString( 'Warning', $html, $key );
+			$this->assertSame( '', trim( preg_replace( '/<!--.*?-->/s', '', implode( '', array_map( static fn( $b ) => null === $b['blockName'] ? $b['innerHTML'] : '', parse_blocks( $html ) ) ) ) ), $key );
+		}
+	}
+
+	public function test_faq_pattern_uses_details_blocks_and_hides_disabled_payment_questions(): void {
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'no' );
+		$html = $this->render_pattern( 'page-faq' );
+		$this->assertGreaterThanOrEqual( 8, substr_count( $html, '<!-- wp:details' ) );
+		$this->assertStringContainsString( 'Can I pay when the books arrive?', $html );
+		$this->assertStringContainsString( 'How does paying with eSewa work?', $html );
+		$this->payments( array( 'cod' => 'no', 'esewa' => 'no' ), 'no' );
+		$html = $this->render_pattern( 'page-faq' );
+		$this->assertStringNotContainsString( 'Can I pay when the books arrive?', $html );
+		$this->assertStringNotContainsString( 'eSewa work', $html );
+	}
+
+	public function test_delivery_page_nests_the_live_rates_pattern_and_skips_unavailable_payment_text(): void {
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'no' ), 'no' );
+		$html = $this->render_pattern( 'page-delivery' );
+		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/delivery-rates"} /-->', $html );
+		$this->assertStringContainsString( 'Packed', $html );
+		$this->assertStringContainsString( 'Shipped', $html );
+		$this->assertStringContainsString( 'Delivered', $html );
+		$this->assertStringContainsString( 'cash on delivery', $html );
+		$this->assertStringNotContainsString( 'Pay online with eSewa', $html );
+	}
+
+	public function test_footer_links_only_published_pages(): void {
+		foreach ( array( 'about', 'contact', 'delivery', 'faq', 'tracking', 'returns', 'privacy', 'terms' ) as $key ) {
+			delete_option( Theme::PAGE_OPTIONS[ $key ] );
+		}
+		$this->assertSame( '', trim( wp_strip_all_tags( $this->render_pattern( 'footer-legal' ) ) ) );
+		$this->assertStringNotContainsString( 'href=', $this->render_pattern( 'footer-help' ) );
+
+		$draft = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'draft' ) );
+		$pub   = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+		update_option( 'wp_page_for_privacy_policy', $draft );
+		update_option( 'woocommerce_terms_page_id', $pub );
+		update_option( 'bsn_page_faq', $pub );
+		$legal = $this->render_pattern( 'footer-legal' );
+		$this->assertStringContainsString( 'Terms &amp; conditions', $legal );
+		$this->assertStringNotContainsString( 'Privacy policy', $legal );
+		$help = $this->render_pattern( 'footer-help' );
+		$this->assertStringContainsString( '>FAQ</a>', $help );
+		$this->assertStringNotContainsString( 'Delivery information', $help );
+	}
+
+	public function test_footer_part_uses_contact_and_legal_patterns(): void {
+		$footer = (string) file_get_contents( dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/parts/footer.html' );
+		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/contact-details"} /-->', $footer );
+		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/footer-legal"} /-->', $footer );
+		$this->assertStringNotContainsString( 'CLIENT', $footer );
 	}
 }
