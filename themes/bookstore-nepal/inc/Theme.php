@@ -486,8 +486,10 @@ final class Theme {
 	 * Payment methods checkout currently offers, in a fixed order: eSewa, Khalti, cash on delivery.
 	 *
 	 * A method counts when its gateway is installed and switched on in WooCommerce. eSewa and Khalti
-	 * must also report themselves available (e.g. eSewa needs its keys and NPR). Cash on delivery's
+	 * must also report themselves available (e.g. they need their keys and NPR). Cash on delivery's
 	 * availability depends on the cart's delivery method, so for it being switched on is enough.
+	 * Khalti is our own gateway (bsn_khalti); the third-party plugin's "khalti" gateway cannot take
+	 * payments in the block checkout, so it is never advertised.
 	 *
 	 * @return array<string,string> Gateway id => label, e.g. [ 'esewa' => 'eSewa', 'cod' => 'Cash on delivery' ].
 	 */
@@ -496,9 +498,9 @@ final class Theme {
 			return array();
 		}
 		$labels   = array(
-			'esewa'  => __( 'eSewa', 'bookstore-nepal' ),
-			'khalti' => __( 'Khalti', 'bookstore-nepal' ),
-			'cod'    => __( 'Cash on delivery', 'bookstore-nepal' ),
+			'esewa'      => __( 'eSewa', 'bookstore-nepal' ),
+			'bsn_khalti' => __( 'Khalti', 'bookstore-nepal' ),
+			'cod'        => __( 'Cash on delivery', 'bookstore-nepal' ),
 		);
 		$gateways = WC()->payment_gateways()->payment_gateways();
 		$methods  = array();
