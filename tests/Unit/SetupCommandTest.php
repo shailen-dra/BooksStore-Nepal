@@ -1,6 +1,8 @@
 <?php
 use BookstoreNepal\Cli\SetupCommand;
 use BookstoreNepal\Shipping;
+use Automattic\WooCommerce\Blocks\Domain\Services\CoreCheckoutFields;
+use Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils;
 
 class SetupCommandTest extends WP_UnitTestCase {
 
@@ -122,6 +124,80 @@ class SetupCommandTest extends WP_UnitTestCase {
 		$this->assertSame( '2500', $this->free_min() );
 	}
 
+	public function test_first_run_requires_phone_including_block_checkout(): void {
+		update_option( 'woocommerce_checkout_phone_field', 'optional' );
+		( new SetupCommand() )->run( array() );
+		$this->assertSame( 'required', get_option( 'woocommerce_checkout_phone_field' ) );
+		$this->assertSame( 'required', CartCheckoutUtils::get_phone_field_visibility() );
+		$fields = CoreCheckoutFields::get_fields();
+		$this->assertTrue( $fields['phone']['required'] );
+		$this->assertFalse( $fields['phone']['hidden'] );
+	}
+
+	public function test_first_run_sells_and_ships_only_to_nepal(): void {
+		( new SetupCommand() )->run( array() );
+		$this->assertSame( 'specific', get_option( 'woocommerce_allowed_countries' ) );
+		$this->assertSame( array( 'NP' ), get_option( 'woocommerce_specific_allowed_countries' ) );
+		$this->assertSame( 'specific', get_option( 'woocommerce_ship_to_countries' ) );
+		$this->assertSame( array( 'NP' ), get_option( 'woocommerce_specific_ship_to_countries' ) );
+		$this->assertSame( array( 'NP' => 'Nepal' ), WC()->countries->get_allowed_countries() );
+	}
+
+	public function test_first_run_sends_low_stock_email_to_site_admin_and_records_setup(): void {
+		update_option( 'admin_email', 'owner@example.com' );
+		$command = new SetupCommand();
+		$command->run( array() );
+		$this->assertSame( 'owner@example.com', get_option( 'woocommerce_stock_email_recipient' ) );
+		$this->assertNotEmpty( get_option( SetupCommand::DONE_OPTION ) );
+		$this->assertFalse( $command->defaults_skipped() );
+	}
+
+	public function test_rerun_leaves_owner_adjusted_settings_alone(): void {
+		( new SetupCommand() )->run( array() );
+
+		// The owner changes things in wp-admin.
+		$cod                       = get_option( 'woocommerce_cod_settings' );
+		$cod['enabled']            = 'no';
+		$cod['title']              = 'Pay the rider';
+		$cod['enable_for_methods'] = array( 'flat_rate' );
+		update_option( 'woocommerce_cod_settings', $cod );
+		update_option( 'woocommerce_notify_low_stock_amount', 5 );
+		update_option( 'woocommerce_notify_no_stock_amount', 1 );
+		update_option( 'woocommerce_stock_email_recipient', 'stock@example.com' );
+		update_option( 'woocommerce_enable_guest_checkout', 'no' );
+		update_option( 'woocommerce_price_num_decimals', 2 );
+		update_option( 'woocommerce_checkout_phone_field', 'optional' );
+		update_option( 'woocommerce_allowed_countries', 'all' );
+		update_option( 'woocommerce_ship_to_countries', '' );
+		update_option( 'woocommerce_currency', 'USD' );
+
+		$command = new SetupCommand();
+		$this->assertSame( array(), $command->run( array() ) );
+		$this->assertTrue( $command->defaults_skipped() );
+
+		$this->assertSame( $cod, get_option( 'woocommerce_cod_settings' ) );
+		$this->assertEquals( 5, get_option( 'woocommerce_notify_low_stock_amount' ) );
+		$this->assertEquals( 1, get_option( 'woocommerce_notify_no_stock_amount' ) );
+		$this->assertSame( 'stock@example.com', get_option( 'woocommerce_stock_email_recipient' ) );
+		$this->assertSame( 'no', get_option( 'woocommerce_enable_guest_checkout' ) );
+		$this->assertEquals( 2, get_option( 'woocommerce_price_num_decimals' ) );
+		$this->assertSame( 'optional', get_option( 'woocommerce_checkout_phone_field' ) );
+		$this->assertSame( 'all', get_option( 'woocommerce_allowed_countries' ) );
+		$this->assertSame( '', get_option( 'woocommerce_ship_to_countries' ) );
+
+		// Structural settings are still enforced on every run.
+		$this->assertSame( 'NPR', get_option( 'woocommerce_currency' ) );
+		$this->assertSame( 2, $this->zone_count() );
+	}
+
+	public function test_deleting_done_option_reapplies_defaults(): void {
+		( new SetupCommand() )->run( array() );
+		update_option( 'woocommerce_notify_low_stock_amount', 5 );
+		delete_option( SetupCommand::DONE_OPTION );
+		( new SetupCommand() )->run( array() );
+		$this->assertEquals( 3, get_option( 'woocommerce_notify_low_stock_amount' ) );
+	}
+
 	public function test_seed_creates_zones_with_placeholder_rates_when_missing(): void {
 		Shipping::seed();
 		$this->assertSame( 2, $this->zone_count() );
@@ -139,6 +215,7 @@ class SetupCommandTest extends WP_UnitTestCase {
 		}
 		$this->assertSame( '111', $this->flat_cost( Shipping::ZONE_VALLEY ) );
 		$this->assertNotSame( 'NPR', get_option( 'woocommerce_currency' ), 'Nothing applied on invalid input.' );
+		$this->assertFalse( get_option( SetupCommand::DONE_OPTION ), 'Invalid input does not count as the first run.' );
 	}
 
 	public function test_setup_sets_pretty_permalinks_when_plain(): void {

@@ -44,7 +44,9 @@ Run WP-CLI commands from the WordPress directory, or pass `--path=`.
    ```
    Until the client supplies real rates, the placeholders are Valley NPR 100, Rest of Nepal NPR 200, free delivery over NPR 2,000. Running `wp bsn setup` with no flags uses these on a fresh install and leaves existing rates alone on later runs. Pass a flag to change just that rate.
 
-   `wp bsn setup` is safe to run again. It sets currency to NPR, the default country to Nepal, no decimals in prices, stock management on (low-stock alert at 3), guest checkout on, enables cash on delivery, creates the Age group / Language / Book type attributes, the "Kathmandu Valley" and "Rest of Nepal" shipping zones, and the "Track your order" page. If permalinks are still plain, it switches them to `/%postname%/`.
+   `wp bsn setup` is safe to run again. Every run sets currency to NPR, the default country to Nepal and stock management on, creates the Age group / Language / Book type attributes, the "Kathmandu Valley" and "Rest of Nepal" shipping zones and the "Track your order" page if any are missing, and switches permalinks to `/%postname%/` if they are still plain.
+
+   The **first run only** also applies these store defaults, which the owner may later change in wp-admin: cash on delivery enabled for every delivery method, low-stock alert at 3 (out of stock at 0) emailed to the site admin address, guest checkout on, no decimals in prices, phone number required at checkout, and selling and delivering to Nepal only. Later runs leave them as the owner set them and print a line saying so. Setup records the first run in the `bsn_setup_done` option; to apply the defaults again (overwriting the owner's changes), run `wp option delete bsn_setup_done && wp bsn setup`.
 6. **Rewrite rules.** `wp bsn setup` only clears the stored rewrite rules so WordPress rebuilds them on the next request. That does not write `.htaccess`. On Apache hosts run this once after setup, or open **Settings › Permalinks** in wp-admin and click **Save Changes**:
    ```bash
    wp rewrite flush --hard
@@ -86,7 +88,7 @@ Once a working option exists (a plugin version with block-checkout support, or a
 
 ### Cash on delivery
 
-Enabled by `wp bsn setup`. Check it under **WooCommerce › Settings › Payments** if needed.
+Enabled by the first `wp bsn setup` run. Later runs do not touch it, so if the owner switches it off or changes its title, it stays that way. Check it under **WooCommerce › Settings › Payments** if needed.
 
 ## 4. Final checks before launch
 
@@ -112,4 +114,4 @@ Enabled by `wp bsn setup`. Check it under **WooCommerce › Settings › Payment
 4. Review **WooCommerce › Status** for warnings, and check there are no PHP errors in the server log.
 5. Check that low-stock and order emails are still being delivered.
 6. Remove unused plugins and users. Make sure admin accounts have strong passwords.
-7. Deploy any new version of `bookstore-nepal-core` or `bookstore-nepal` by copying the updated folders from the repo, then re-run `wp bsn setup` (without rate flags, so rates are untouched) and `wp rewrite flush --hard` on Apache.
+7. Deploy any new version of `bookstore-nepal-core` or `bookstore-nepal` by copying the updated folders from the repo, then re-run `wp bsn setup` (without rate flags, so rates are untouched; the owner's payment, stock, checkout and country settings are also left alone) and `wp rewrite flush --hard` on Apache.

@@ -14,10 +14,23 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Configures the store for Nepal; safe to run repeatedly.
+ *
+ * Settings the owner may change in wp-admin (cash on delivery, stock alerts, guest checkout,
+ * decimals, phone field, countries) are applied on the first run only; see DONE_OPTION.
  */
 class SetupCommand {
 
 	public const TRACKING_PAGE_OPTION = 'bsn_tracking_page_id';
+
+	/** Set once the store defaults have been applied; delete it to apply them again. */
+	public const DONE_OPTION = 'bsn_setup_done';
+
+	/**
+	 * Whether the last run skipped the store defaults because setup had already run.
+	 *
+	 * @var bool
+	 */
+	private bool $defaults_skipped = false;
 
 	/**
 	 * Registers the command when WP-CLI is running.
@@ -31,6 +44,9 @@ class SetupCommand {
 	/**
 	 * Applies store settings, catalogue attributes, shipping zones, COD and the tracking page.
 	 *
+	 * Store defaults the owner can change in wp-admin (cash on delivery, low-stock alerts, guest
+	 * checkout, price decimals, required phone, selling and shipping to Nepal only) are applied on
+	 * the first run only. To apply them again: `wp option delete bsn_setup_done`, then re-run.
 	 * Existing shipping rates are left alone unless a rate flag is given.
 	 *
 	 * ## OPTIONS
@@ -49,6 +65,9 @@ class SetupCommand {
 	 */
 	public function __invoke( $args, $assoc_args ) {
 		$errors = $this->run( (array) $assoc_args );
+		if ( $this->defaults_skipped ) {
+			\WP_CLI::log( 'Store defaults (cash on delivery, stock alerts, guest checkout, decimals, phone, countries) were not changed because setup already ran. To re-apply them: wp option delete ' . self::DONE_OPTION . ' && wp bsn setup' );
+		}
 		foreach ( $errors as $error ) {
 			\WP_CLI::warning( $error );
 		}
@@ -84,18 +103,19 @@ class SetupCommand {
 
 		update_option( 'woocommerce_currency', 'NPR' );
 		update_option( 'woocommerce_default_country', 'NP:NP-D-KATHMANDU' );
-		update_option( 'woocommerce_enable_guest_checkout', 'yes' );
 		update_option( 'woocommerce_manage_stock', 'yes' );
-		update_option( 'woocommerce_notify_low_stock_amount', 3 );
-		update_option( 'woocommerce_notify_no_stock_amount', 0 );
-		update_option( 'woocommerce_price_num_decimals', 0 );
+
+		$this->defaults_skipped = (bool) get_option( self::DONE_OPTION );
+		if ( ! $this->defaults_skipped ) {
+			$this->apply_store_defaults();
+			update_option( self::DONE_OPTION, gmdate( 'c' ), false );
+		}
 
 		if ( '' === (string) get_option( 'permalink_structure' ) ) {
 			global $wp_rewrite;
 			$wp_rewrite->set_permalink_structure( '/%postname%/' );
 		}
 
-		$this->enable_cod();
 		$this->ensure_tracking_page();
 
 		$errors = array_merge( Catalog::install(), Shipping::seed( $rates ) );
@@ -105,6 +125,32 @@ class SetupCommand {
 		delete_option( 'rewrite_rules' );
 
 		return $errors;
+	}
+
+	/**
+	 * Whether the last run() skipped the store defaults because setup had already run.
+	 */
+	public function defaults_skipped(): bool {
+		return $this->defaults_skipped;
+	}
+
+	/**
+	 * First-run defaults the owner may later change in wp-admin.
+	 */
+	private function apply_store_defaults(): void {
+		update_option( 'woocommerce_enable_guest_checkout', 'yes' );
+		update_option( 'woocommerce_notify_low_stock_amount', 3 );
+		update_option( 'woocommerce_notify_no_stock_amount', 0 );
+		update_option( 'woocommerce_stock_email_recipient', (string) get_option( 'admin_email' ) );
+		update_option( 'woocommerce_price_num_decimals', 0 );
+		// Riders and couriers phone the customer; the block checkout reads this option too.
+		update_option( 'woocommerce_checkout_phone_field', 'required' );
+		// Delivery exists only inside Nepal, so customers cannot pick another country.
+		update_option( 'woocommerce_allowed_countries', 'specific' );
+		update_option( 'woocommerce_specific_allowed_countries', array( 'NP' ) );
+		update_option( 'woocommerce_ship_to_countries', 'specific' );
+		update_option( 'woocommerce_specific_ship_to_countries', array( 'NP' ) );
+		$this->enable_cod();
 	}
 
 	/**
