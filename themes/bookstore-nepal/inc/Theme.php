@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.0';
+	public const VERSION = '0.1.1';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -288,6 +288,61 @@ final class Theme {
 	 */
 	public static function flush_rates(): void {
 		self::$rates = null;
+	}
+
+	/**
+	 * Payment methods checkout currently offers, in a fixed order: eSewa, Khalti, cash on delivery.
+	 *
+	 * A method counts when its gateway is installed and switched on in WooCommerce. eSewa and Khalti
+	 * must also report themselves available (e.g. eSewa needs its keys and NPR). Cash on delivery's
+	 * availability depends on the cart's delivery method, so for it being switched on is enough.
+	 *
+	 * @return array<string,string> Gateway id => label, e.g. [ 'esewa' => 'eSewa', 'cod' => 'Cash on delivery' ].
+	 */
+	public static function payment_methods(): array {
+		if ( ! function_exists( 'WC' ) || ! WC()->payment_gateways() ) {
+			return array();
+		}
+		$labels   = array(
+			'esewa'  => __( 'eSewa', 'bookstore-nepal' ),
+			'khalti' => __( 'Khalti', 'bookstore-nepal' ),
+			'cod'    => __( 'Cash on delivery', 'bookstore-nepal' ),
+		);
+		$gateways = WC()->payment_gateways()->payment_gateways();
+		$methods  = array();
+		foreach ( $labels as $id => $label ) {
+			$gateway = $gateways[ $id ] ?? null;
+			if ( ! $gateway instanceof \WC_Payment_Gateway || 'yes' !== $gateway->enabled ) {
+				continue;
+			}
+			if ( 'cod' !== $id && ! $gateway->is_available() ) {
+				continue;
+			}
+			$methods[ $id ] = $label;
+		}
+		return $methods;
+	}
+
+	/**
+	 * Enabled payment methods as a phrase, e.g. "eSewa, Khalti and cash on delivery"; empty if none.
+	 *
+	 * @param string $conjunction 'and' or 'or'.
+	 */
+	public static function payment_list( string $conjunction = 'and' ): string {
+		$names = array();
+		foreach ( self::payment_methods() as $id => $label ) {
+			$names[] = 'cod' === $id ? __( 'cash on delivery', 'bookstore-nepal' ) : $label;
+		}
+		if ( count( $names ) < 2 ) {
+			return (string) ( $names[0] ?? '' );
+		}
+		$last = array_pop( $names );
+		$head = implode( __( ', ', 'bookstore-nepal' ), $names );
+		return 'or' === $conjunction
+			/* translators: 1: comma-separated payment methods, 2: the last payment method. */
+			? sprintf( __( '%1$s or %2$s', 'bookstore-nepal' ), $head, $last )
+			/* translators: 1: comma-separated payment methods, 2: the last payment method. */
+			: sprintf( __( '%1$s and %2$s', 'bookstore-nepal' ), $head, $last );
 	}
 
 	/**

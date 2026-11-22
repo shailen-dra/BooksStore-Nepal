@@ -14,6 +14,7 @@ use BookstoreNepal\Theme\Theme;
 defined( 'ABSPATH' ) || exit;
 
 $bsn_rates = Theme::delivery_rates();
+$bsn_pay   = Theme::payment_list( 'or' );
 ?>
 <!-- wp:group {"tagName":"section","className":"bsn-delivery","layout":{"type":"default"}} -->
 <section class="wp-block-group bsn-delivery"><!-- wp:paragraph {"className":"bsn-delivery__title"} -->
@@ -41,7 +42,11 @@ $bsn_rates = Theme::delivery_rates();
 <p><?php echo esc_html( sprintf( __( 'Free delivery on orders over %s', 'bookstore-nepal' ), Theme::npr( $bsn_rates['free_over'] ) ) ); ?></p>
 <!-- /wp:paragraph -->
 <?php endif; ?>
+<?php if ( '' !== $bsn_pay ) : ?>
 <!-- wp:paragraph {"className":"bsn-delivery__pay"} -->
-<p class="bsn-delivery__pay"><?php esc_html_e( 'Pay with eSewa, Khalti or cash on delivery', 'bookstore-nepal' ); ?></p>
-<!-- /wp:paragraph --></section>
+<?php /* translators: %s: payment methods, e.g. eSewa or cash on delivery. */ ?>
+<p class="bsn-delivery__pay"><?php echo esc_html( sprintf( __( 'Pay with %s', 'bookstore-nepal' ), $bsn_pay ) ); ?></p>
+<!-- /wp:paragraph -->
+<?php endif; ?>
+</section>
 <!-- /wp:group -->

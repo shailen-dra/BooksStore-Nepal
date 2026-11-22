@@ -23,9 +23,16 @@ class ThemeTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
+		remove_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
 		unset( $GLOBALS['product'] );
 		Theme::flush_rates();
 		parent::tear_down();
+		if ( $this->gateways_changed ) {
+			// Reload gateways from the rolled-back settings so later tests see the original state.
+			$this->fake_khalti      = null;
+			$this->gateways_changed = false;
+			WC()->payment_gateways()->init();
+		}
 	}
 
 	private function query( string $url ): array {
@@ -202,5 +209,111 @@ class ThemeTest extends WP_UnitTestCase {
 		GiftFinder::register();
 		$html = do_blocks( '<!-- wp:shortcode -->[bsn_gift_finder]<!-- /wp:shortcode -->' );
 		$this->assertStringContainsString( '<form class="bsn-gift-finder"', $html );
+	}
+
+	/** @var WC_Payment_Gateway|null Stand-in for the Khalti plugin's gateway. */
+	private $fake_khalti = null;
+
+	/** @var bool Whether a test reloaded the payment gateways. */
+	private $gateways_changed = false;
+
+	public function add_fake_khalti( $gateways ) {
+		$gateways[] = $this->fake_khalti;
+		return $gateways;
+	}
+
+	/**
+	 * Configures gateways and reloads them, as on a fresh request.
+	 *
+	 * @param array       $enabled Gateway id => 'yes'|'no' for esewa and cod.
+	 * @param string|null $khalti  'yes'|'no' to register a Khalti gateway, null for not installed.
+	 */
+	private function payments( array $enabled, ?string $khalti = null ): void {
+		$this->gateways_changed = true;
+		update_option( 'woocommerce_currency', 'NPR' );
+		update_option( 'woocommerce_esewa_settings', array( 'enabled' => $enabled['esewa'] ?? 'no', 'testmode' => 'yes' ) );
+		update_option( 'woocommerce_cod_settings', array( 'enabled' => $enabled['cod'] ?? 'no', 'enable_for_methods' => array(), 'enable_for_virtual' => 'no' ) );
+		remove_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
+		$this->fake_khalti = null;
+		if ( null !== $khalti ) {
+			update_option( 'woocommerce_khalti_settings', array( 'enabled' => $khalti ) );
+			$this->fake_khalti = new class() extends WC_Payment_Gateway {
+				public function __construct() {
+					$this->id    = 'khalti';
+					$this->title = 'Khalti';
+					$this->init_settings();
+					$this->enabled = $this->get_option( 'enabled', 'no' );
+				}
+			};
+			add_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
+		}
+		WC()->payment_gateways()->init();
+	}
+
+	private function render_pattern( string $slug ): string {
+		ob_start();
+		include dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/patterns/' . $slug . '.php';
+		return (string) ob_get_clean();
+	}
+
+	public function test_payment_methods_lists_enabled_gateways_in_fixed_order(): void {
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'yes' );
+		$this->assertSame(
+			array(
+				'esewa'  => 'eSewa',
+				'khalti' => 'Khalti',
+				'cod'    => 'Cash on delivery',
+			),
+			Theme::payment_methods()
+		);
+		$this->assertSame( 'eSewa, Khalti and cash on delivery', Theme::payment_list() );
+		$this->assertSame( 'eSewa, Khalti or cash on delivery', Theme::payment_list( 'or' ) );
+	}
+
+	public function test_payment_methods_hide_disabled_or_missing_gateways(): void {
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'no' );
+		$this->assertSame( array( 'esewa', 'cod' ), array_keys( Theme::payment_methods() ) );
+		$this->assertSame( 'eSewa or cash on delivery', Theme::payment_list( 'or' ) );
+
+		$this->payments( array( 'cod' => 'yes' ) );
+		$this->assertSame( array( 'cod' ), array_keys( Theme::payment_methods() ) );
+		$this->assertSame( 'cash on delivery', Theme::payment_list() );
+	}
+
+	public function test_payment_methods_skip_esewa_that_cannot_take_payments(): void {
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ) );
+		update_option( 'woocommerce_esewa_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'product_code' => '', 'secret_key' => '' ) );
+		WC()->payment_gateways()->init();
+		$this->assertSame( array( 'cod' ), array_keys( Theme::payment_methods() ) );
+	}
+
+	public function test_payment_methods_empty_when_none_enabled(): void {
+		$this->payments( array() );
+		$this->assertSame( array(), Theme::payment_methods() );
+		$this->assertSame( '', Theme::payment_list() );
+	}
+
+	public function test_payment_copy_in_patterns_follows_enabled_gateways(): void {
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'no' );
+		foreach ( array( 'trust-strip', 'book-delivery', 'footer-payments' ) as $slug ) {
+			$html = $this->render_pattern( $slug );
+			$this->assertStringNotContainsString( 'Khalti', $html, $slug );
+			$this->assertStringContainsString( 'eSewa', $html, $slug );
+		}
+		$this->assertStringContainsString( 'We accept eSewa and cash on delivery.', $this->render_pattern( 'footer-payments' ) );
+		$this->assertStringContainsString( 'Pay with eSewa or cash on delivery', $this->render_pattern( 'book-delivery' ) );
+		$this->assertStringContainsString( 'Delivery all over Nepal', $this->render_pattern( 'trust-strip' ) );
+
+		$this->payments( array() );
+		$this->assertStringNotContainsString( 'We accept', $this->render_pattern( 'footer-payments' ) );
+		$this->assertStringNotContainsString( 'Pay with', $this->render_pattern( 'book-delivery' ) );
+		$this->assertStringNotContainsString( 'Pay with', $this->render_pattern( 'trust-strip' ) );
+		$this->assertStringNotContainsString( 'Cash on delivery', $this->render_pattern( 'trust-strip' ) );
+	}
+
+	public function test_footer_uses_payments_pattern_not_static_copy(): void {
+		$footer = (string) file_get_contents( dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/parts/footer.html' );
+		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/footer-payments"} /-->', $footer );
+		$this->assertStringNotContainsString( 'Khalti', $footer );
 	}
 }
