@@ -951,7 +951,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 
 	/**
 	 * Remembers each settled (non-retry) answer, once per transaction and status, with an order
-	 * note when asked. The caller saves the order.
+	 * note when asked (always for PARTIAL_REFUND). The caller saves the order.
 	 *
 	 * @param WC_Order $order      Order.
 	 * @param array    $checks     uuid => check_status() result.
@@ -972,7 +972,16 @@ class EsewaGateway extends WC_Payment_Gateway {
 			}
 			$noted[ $uuid ][ $key ] = gmdate( 'c' );
 			$changed                = true;
-			if ( $with_notes ) {
+			if ( 'PARTIAL_REFUND' === $key ) {
+				// Money is still held, whatever the order's state: staff always need to know.
+				$order->add_order_note(
+					sprintf(
+						/* translators: %s: eSewa transaction UUID. */
+						__( 'Automatic eSewa payment check for transaction %s: eSewa status check returned PARTIAL_REFUND. eSewa still holds part of this payment: check the eSewa merchant portal and refund the rest or complete the order by hand.', 'bookstore-nepal' ),
+						$uuid
+					)
+				);
+			} elseif ( $with_notes ) {
 				$order->add_order_note(
 					sprintf(
 						/* translators: 1: eSewa transaction UUID, 2: result of the status check. */

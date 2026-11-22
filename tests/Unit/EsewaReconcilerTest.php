@@ -393,6 +393,34 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		$this->assertCount( 4, $this->requested, 'A cancelled transaction is final: not checked again.' );
 	}
 
+	public function test_partial_refund_note_says_esewa_still_holds_part_of_the_payment(): void {
+		$order = $this->order( 90 );
+		$this->statuses[ $this->uuid( $order ) ] = 'PARTIAL_REFUND';
+		EsewaReconciler::run();
+		EsewaReconciler::run();
+		$order = $this->fresh( $order );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'PARTIAL_REFUND' ) );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'eSewa still holds part of this payment' ) );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'check the eSewa merchant portal' ) );
+		$this->assertFalse( $order->is_paid() );
+		$this->assertCount( 1, $this->requested, 'Final status: not asked again.' );
+		$this->assertTrue( $this->should_cancel( $order ), 'May still be auto-cancelled.' );
+	}
+
+	public function test_partial_refund_of_another_attempt_on_a_paid_order_is_noted(): void {
+		$order = $this->order();
+		$first = $order->get_id() . '-1700000000';
+		$order = $this->add_earlier_attempt( $order, $first );
+		$this->statuses[ $this->uuid( $order ) ] = 'COMPLETE';
+		$this->callback_success( $order, $this->uuid( $order ) );
+		$this->statuses[ $first ] = 'PARTIAL_REFUND';
+		EsewaReconciler::run();
+		EsewaReconciler::run();
+		$order = $this->fresh( $order );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'eSewa still holds part of this payment' ) );
+		$this->assertSame( 1, $this->count_notes_containing( $order, $first ) );
+	}
+
 	public function test_complete_with_wrong_amount_is_noted_once_and_not_completed(): void {
 		$order = $this->order();
 		$this->statuses[ $this->uuid( $order ) ] = array(
