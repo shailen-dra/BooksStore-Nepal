@@ -91,7 +91,7 @@ class SetupCommand {
 				continue;
 			}
 			$value = $assoc_args[ $flag ];
-			if ( ! is_int( $value ) && ! ( is_string( $value ) && 1 === preg_match( '/^\d+$/', $value ) ) ) {
+			if ( ! is_int( $value ) && ! ( is_string( $value ) && 1 === preg_match( '/^\d+\z/', $value ) ) ) {
 				$errors[] = sprintf( '--%s must be a non-negative whole number of NPR.', $flag );
 				continue;
 			}

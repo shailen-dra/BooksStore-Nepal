@@ -208,7 +208,7 @@ class SetupCommandTest extends WP_UnitTestCase {
 
 	public function test_invalid_rate_flags_rejected_before_any_change(): void {
 		Shipping::install( array( 'valley' => 111, 'rest' => 222, 'free_over' => 3333 ) );
-		foreach ( array( 'abc', '-5', '12.5', '', '1e3' ) as $bad ) {
+		foreach ( array( 'abc', '-5', '12.5', '', '1e3', "150\n" ) as $bad ) {
 			$errors = ( new SetupCommand() )->run( array( 'valley' => '150', 'rest' => $bad ) );
 			$this->assertNotEmpty( $errors, "Value '$bad' should be rejected." );
 			$this->assertStringContainsString( '--rest', $errors[0] );
