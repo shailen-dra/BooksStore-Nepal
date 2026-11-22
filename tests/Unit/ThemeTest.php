@@ -116,10 +116,46 @@ class ThemeTest extends WP_UnitTestCase {
 	public function test_product_image_gets_cover_and_age_badge(): void {
 		$id   = $this->book( 'हिमालको कथा', array( 'pa_age-group' => '8-12' ) );
 		$html = '<div class="wc-block-components-product-image"><a href="/p"><img src="p.webp" class="woocommerce-placeholder wp-post-image" alt=""></a></div>';
-		$out  = Theme::filter_product_image( $html, array( 'attrs' => array( 'productId' => $id ) ) );
+		$out  = Theme::filter_product_image( $html, array( 'attrs' => array( 'productId' => $id, 'className' => Theme::CARD_IMAGE_CLASS ) ) );
 		$this->assertStringNotContainsString( 'woocommerce-placeholder', $out );
 		$this->assertStringContainsString( 'class="bsn-cover" role="img" aria-label="हिमालको कथा"', $out );
-		$this->assertStringContainsString( '<a href="/p"><span class="bsn-age-badge">Ages 8–12</span>', $out );
+		// The badge sits outside the link so it is read as text, not as part of a second link name.
+		$this->assertStringContainsString( '<div class="wc-block-components-product-image"><span class="bsn-age-badge">Ages 8–12</span><a href="/p" aria-hidden="true" tabindex="-1">', $out );
+	}
+
+	public function test_card_has_one_link_per_book(): void {
+		Theme::register();
+		$id   = $this->book( 'Yak', array( 'pa_age-group' => '4-7' ) );
+		$html = '';
+		// The title block reads the global post, as inside a product collection loop.
+		$previous        = $GLOBALS['post'] ?? null;
+		$GLOBALS['post'] = get_post( $id );
+		setup_postdata( $GLOBALS['post'] );
+		try {
+			foreach ( parse_blocks( Theme::card_markup() ) as $block ) {
+				if ( in_array( $block['blockName'], array( 'woocommerce/product-image', 'core/post-title' ), true ) ) {
+					$html .= ( new WP_Block( $block, array( 'postId' => $id, 'postType' => 'product' ) ) )->render();
+				}
+			}
+		} finally {
+			$GLOBALS['post'] = $previous;
+			wp_reset_postdata();
+		}
+		preg_match_all( '#<a\b[^>]*>#', $html, $links );
+		$this->assertCount( 2, $links[0], $html );
+		$focusable = array_filter( $links[0], static fn( $a ) => false === strpos( $a, 'tabindex="-1"' ) );
+		$this->assertCount( 1, $focusable, 'Only the title link is a tab stop.' );
+		$this->assertStringContainsString( 'aria-hidden="true"', implode( '', array_diff( $links[0], $focusable ) ) );
+		$this->assertStringContainsString( 'Ages 4–7', $html, 'Badge still shown.' );
+		$this->assertDoesNotMatchRegularExpression( '#<a\b[^>]*>\s*<span class="bsn-age-badge">#', $html );
+	}
+
+	public function test_product_image_link_outside_cards_stays_focusable(): void {
+		$id   = $this->book( 'Yak', array( 'pa_age-group' => '4-7' ) );
+		$html = '<div class="wc-block-components-product-image"><a href="/p"><img src="p.webp" alt="Yak"></a></div>';
+		$out  = Theme::filter_product_image( $html, array( 'attrs' => array( 'productId' => $id ) ) );
+		$this->assertStringContainsString( '<span class="bsn-age-badge">Ages 4–7</span><a href="/p">', $out );
+		$this->assertStringNotContainsString( 'tabindex', $out );
 	}
 
 	public function test_product_image_without_badge_class_or_product(): void {
@@ -139,6 +175,20 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Devkota', $out );
 		$this->assertStringContainsString( 'Nepali', $out );
 		$this->assertSame( '<div>x</div>', Theme::filter_details_slot( '<div>x</div>', array( 'attrs' => array() ) ) );
+	}
+
+	public function test_details_slot_restores_global_product(): void {
+		$id = $this->book( 'B', array( 'pa_language' => 'nepali' ) );
+		$this->go_to( get_permalink( $id ) );
+		$slot = array( 'attrs' => array( 'className' => 'bsn-book-details-slot' ) );
+
+		unset( $GLOBALS['product'] );
+		$this->assertStringContainsString( 'Nepali', Theme::filter_details_slot( '', $slot ) );
+		$this->assertArrayNotHasKey( 'product', $GLOBALS );
+
+		$GLOBALS['product'] = 'not a product';
+		Theme::filter_details_slot( '', $slot );
+		$this->assertSame( 'not a product', $GLOBALS['product'] );
 	}
 
 	public function test_breadcrumb_on_book_page_uses_age_group(): void {

@@ -22,6 +22,9 @@ final class Theme {
 	/** Class on a core/post-terms block whose term links render as plain text. */
 	public const PLAIN_TERMS_CLASS = 'bsn-plain-terms';
 
+	/** Class on the product image block of a book card; its link is skipped because the title links too. */
+	public const CARD_IMAGE_CLASS = 'bsn-card__image';
+
 	/** Class on a product image block that should not get the age badge. */
 	public const NO_BADGE_CLASS = 'bsn-no-badge';
 
@@ -415,12 +418,17 @@ final class Theme {
 		}
 
 		$class = (string) ( $block['attrs']['className'] ?? '' );
-		$age   = self::age_label( $product->get_id() );
+		if ( false !== strpos( $class, self::CARD_IMAGE_CLASS ) ) {
+			// The card title links to the same page, so keep the image link out of the tab order and screen readers.
+			$html = (string) preg_replace( '#<a\b(?![^>]*\btabindex=)([^>]*)>#', '<a$1 aria-hidden="true" tabindex="-1">', $html, 1 );
+		}
+		$age = self::age_label( $product->get_id() );
 		if ( '' !== $age && false === strpos( $class, self::NO_BADGE_CLASS ) ) {
 			/* translators: %s: age range, e.g. 4–7. */
 			$badge = '<span class="bsn-age-badge">' . esc_html( sprintf( __( 'Ages %s', 'bookstore-nepal' ), $age ) ) . '</span>';
+			// Before the link, not inside it, so it is read as text rather than as part of the link.
 			$count = 0;
-			$out   = preg_replace( '#(<a\b[^>]*>)#', '$1' . str_replace( '$', '\$', $badge ), $html, 1, $count );
+			$out   = preg_replace( '#<a\b#', str_replace( '$', '\$', $badge ) . '<a', $html, 1, $count );
 			if ( ! $count ) {
 				$out = preg_replace( '#^(\s*<div\b[^>]*>)#', '$1' . str_replace( '$', '\$', $badge ), $html, 1 );
 			}
@@ -457,13 +465,23 @@ final class Theme {
 		if ( ! class_exists( '\BookstoreNepal\Catalog' ) ) {
 			return '';
 		}
-		global $product;
-		if ( ! $product instanceof \WC_Product ) {
-			$product = wc_get_product( get_the_ID() );
+		// render_details() reads the global product; borrow it and put back whatever was there.
+		$had_product = array_key_exists( 'product', $GLOBALS );
+		$previous    = $GLOBALS['product'] ?? null;
+		if ( ! $previous instanceof \WC_Product ) {
+			$GLOBALS['product'] = wc_get_product( get_the_ID() ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 		}
-		ob_start();
-		\BookstoreNepal\Catalog::render_details();
-		$details = trim( (string) ob_get_clean() );
+		try {
+			ob_start();
+			\BookstoreNepal\Catalog::render_details();
+			$details = trim( (string) ob_get_clean() );
+		} finally {
+			if ( $had_product ) {
+				$GLOBALS['product'] = $previous; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+			} else {
+				unset( $GLOBALS['product'] );
+			}
+		}
 		return '' === $details ? '' : '<div class="bsn-book-details-wrap">' . $details . '</div>';
 	}
 
@@ -487,13 +505,12 @@ final class Theme {
 		if ( ! function_exists( 'is_product' ) || ! is_product() || count( $crumbs ) < 2 ) {
 			return $crumbs;
 		}
-		$age_slugs = wc_get_product_terms( (int) get_queried_object_id(), 'pa_age-group', array( 'fields' => 'slugs' ) );
-		$age_names = wc_get_product_terms( (int) get_queried_object_id(), 'pa_age-group', array( 'fields' => 'names' ) );
-		if ( is_wp_error( $age_slugs ) || ! $age_slugs || is_wp_error( $age_names ) ) {
+		$terms = wc_get_product_terms( (int) get_queried_object_id(), 'pa_age-group', array( 'fields' => 'all' ) );
+		if ( is_wp_error( $terms ) || ! $terms || ! $terms[0] instanceof \WP_Term ) {
 			return $crumbs;
 		}
 		/* translators: %s: age range, e.g. 4–7. */
-		$age_crumb = array( sprintf( __( 'Ages %s', 'bookstore-nepal' ), $age_names[0] ), self::age_url( (string) $age_slugs[0] ) );
+		$age_crumb = array( sprintf( __( 'Ages %s', 'bookstore-nepal' ), $terms[0]->name ), self::age_url( $terms[0]->slug ) );
 		return array( $crumbs[0], $age_crumb, $crumbs[ count( $crumbs ) - 1 ] );
 	}
 
@@ -545,6 +562,16 @@ final class Theme {
 	 * @param int $heading_level Heading level for the book title.
 	 */
 	public static function card_markup( int $heading_level = 3 ): string {
+		$image = serialize_block_attributes(
+			array(
+				'showSaleBadge'  => true,
+				'saleBadgeAlign' => 'right',
+				'imageSizing'    => 'thumbnail',
+				'aspectRatio'    => '3/4',
+				'scale'          => 'cover',
+				'className'      => self::CARD_IMAGE_CLASS,
+			)
+		);
 		$title = serialize_block_attributes(
 			array(
 				'level'                  => $heading_level,
@@ -553,7 +580,7 @@ final class Theme {
 				'__woocommerceNamespace' => 'woocommerce/product-collection/product-title',
 			)
 		);
-		return '<!-- wp:woocommerce/product-image {"showSaleBadge":true,"saleBadgeAlign":"right","imageSizing":"thumbnail","aspectRatio":"3/4","scale":"cover","className":"bsn-card__image"} /-->
+		return '<!-- wp:woocommerce/product-image ' . $image . ' /-->
 <!-- wp:post-title ' . $title . ' /-->
 <!-- wp:group {"className":"bsn-card__meta","layout":{"type":"default"}} -->
 <div class="wp-block-group bsn-card__meta"><!-- wp:post-terms {"term":"pa_language","className":"bsn-plain-terms"} /-->

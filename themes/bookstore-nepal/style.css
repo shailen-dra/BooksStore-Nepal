@@ -306,6 +306,7 @@ body {
 .bsn-products .wc-block-product-template { gap: 24px; }
 .bsn-products .wc-block-product { display: flex; flex-direction: column; gap: 8px; text-align: left; }
 .bsn-products .wc-block-product > * { margin: 0; }
+.wc-block-components-product-image { position: relative; }
 .wc-block-components-product-image a { position: relative; display: block; }
 .wc-block-components-product-image img { border-radius: var(--wp--custom--radius--medium); }
 
@@ -335,6 +336,7 @@ body {
 	top: 12px;
 	left: 12px;
 	z-index: 1;
+	pointer-events: none;
 	padding: 2px 10px;
 	border-radius: 999px;
 	background: var(--wp--custom--color--white);
