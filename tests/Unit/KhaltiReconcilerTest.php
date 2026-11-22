@@ -695,6 +695,47 @@ class KhaltiReconcilerTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->fresh( $order )->is_paid() );
 	}
 
+	public function test_pidx_started_in_the_other_mode_is_noted_once_and_left_to_woocommerce(): void {
+		$order = $this->order( 90 ); // Started in test mode.
+		$pidx  = $this->pidx( $order );
+		$this->lookups[ $pidx ] = 'Completed';
+		update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'test_secret_key' => self::TEST_KEY, 'secret_key' => 'live_secret_key_fake_1111' ) );
+		$this->reload_payment_gateways();
+
+		KhaltiReconciler::run();
+		KhaltiReconciler::run();
+
+		$order = $this->fresh( $order );
+		$this->assertSame( array(), $this->requested, 'A test-mode pidx is not looked up in live mode.' );
+		$this->assertFalse( $order->is_paid() );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'Khalti payment started in test mode — check the sandbox dashboard' ) );
+		$this->assertTrue( $this->should_cancel( $order ), 'Its only pidx cannot be checked: WooCommerce decides.' );
+		$this->assertSame( array(), $this->requested );
+	}
+
+	public function test_pidx_of_the_current_mode_is_still_checked_beside_one_from_the_other_mode(): void {
+		update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'test_secret_key' => self::TEST_KEY, 'secret_key' => 'live_secret_key_fake_1111' ) );
+		$this->reload_payment_gateways();
+		$this->gateway = new KhaltiGateway();
+		$order         = $this->order( 90 ); // Live pidx.
+		$live          = $this->pidx( $order );
+		$test          = 'TESTMODEpidx';
+		$list          = $order->get_meta( KhaltiGateway::META_PIDXS );
+		$order->update_meta_data(
+			KhaltiGateway::META_PIDXS,
+			array(
+				$test => array(
+					'amount' => '50000',
+					'mode'   => 'test',
+				),
+			) + $list
+		);
+		$order->save();
+		$this->lookups[ $live ] = 'Pending';
+		$this->assertFalse( $this->should_cancel( $this->fresh( $order ) ), 'The live pidx is Pending: wait.' );
+		$this->assertSame( array( $live ), $this->requested );
+	}
+
 	public function test_amount_mismatch_note_tells_staff_to_refund_or_reconcile(): void {
 		$order = $this->order();
 		$this->lookups[ $this->pidx( $order ) ] = array(

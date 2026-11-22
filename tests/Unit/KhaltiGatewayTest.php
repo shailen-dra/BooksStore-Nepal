@@ -319,7 +319,16 @@ class KhaltiGatewayTest extends WP_UnitTestCase {
 
 		$pidx = $this->pidx( $order );
 		$this->assertSame( 'PIDX1abcdefghij', $pidx );
-		$this->assertSame( array( $pidx => '50000' ), $order->get_meta( KhaltiGateway::META_PIDXS ) );
+		$this->assertSame(
+			array(
+				$pidx => array(
+					'amount' => '50000',
+					'mode'   => 'test',
+				),
+			),
+			$order->get_meta( KhaltiGateway::META_PIDXS ),
+			'Each pidx remembers its amount and the mode it was started in.'
+		);
 		$this->assertSame( 'pending', $order->get_status() );
 
 		$result = $this->gateway->process_payment( $order->get_id() );
@@ -646,6 +655,24 @@ class KhaltiGatewayTest extends WP_UnitTestCase {
 		$this->lookups[ $earlier ] = 'Completed';
 		$this->gateway->handle_return( $this->return_query( $order, $earlier ) );
 		$this->assertTrue( $this->fresh( $order )->is_paid() );
+	}
+
+	public function test_pidx_started_in_the_other_mode_is_not_looked_up(): void {
+		$order = $this->order(); // Started in test mode.
+		$pidx  = $this->pidx( $order );
+		$this->lookups[ $pidx ] = 'Completed';
+		// The owner switches to live mode before the customer comes back.
+		update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'test_secret_key' => self::TEST_KEY, 'secret_key' => self::LIVE_KEY ) );
+		$this->gateway = new KhaltiGateway();
+
+		$redirect = $this->gateway->handle_return( $this->return_query( $order, $pidx ) );
+		$this->gateway->handle_return( $this->return_query( $order, $pidx ) );
+
+		$this->assertSame( wc_get_cart_url(), $redirect );
+		$this->assert_unpaid( $order );
+		$this->assertSame( array(), $this->lookup_requests(), 'Never asked of the wrong environment.' );
+		$this->assertSame( 1, $this->count_notes_containing( $this->fresh( $order ), 'Khalti payment started in test mode — check the sandbox dashboard' ) );
+		$this->assertNotEmpty( wc_get_notices( 'error' ) );
 	}
 
 	// ---- Return handler: other statuses --------------------------------------------------

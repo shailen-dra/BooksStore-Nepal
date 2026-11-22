@@ -30,9 +30,14 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	public const API_ACTION = 'bsn_khalti';
 	// The pidx of the latest attempt.
 	public const META_PIDX = '_bsn_khalti_pidx';
-	// Every pidx minted for the order (pidx => amount in paisa), oldest first, so the return
-	// handler and the reconciler accept a payment made on an earlier attempt.
+	// Every pidx minted for the order, oldest first, so the return handler and the reconciler
+	// accept a payment made on an earlier attempt: pidx => [ amount (paisa), mode (test|live) ].
+	// Entries written before modes were recorded are plain pidx => amount strings.
 	public const META_PIDXS = '_bsn_khalti_pidxs';
+	// pidx => time for pidx values noted as started in the other mode (one note each).
+	public const META_MODE_NOTES = '_bsn_khalti_mode_notes';
+	public const MODE_TEST       = 'test';
+	public const MODE_LIVE       = 'live';
 	// The pidx that paid the order (any other paid one is a second payment).
 	public const META_PAID_PIDX    = '_bsn_khalti_paid_pidx';
 	public const META_STRAY_PREFIX = '_bsn_khalti_stray_';
@@ -191,6 +196,13 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	 */
 	public function is_test_mode(): bool {
 		return 'yes' === $this->get_option( 'testmode', 'yes' );
+	}
+
+	/**
+	 * The current mode, as stored with each pidx.
+	 */
+	public function mode(): string {
+		return $this->is_test_mode() ? self::MODE_TEST : self::MODE_LIVE;
 	}
 
 	/**
@@ -454,9 +466,12 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	 * @param string   $pidx  New pidx.
 	 */
 	private function remember_pidx( WC_Order $order, string $pidx ): void {
-		$remembered = $this->remembered_pidxs( $order );
+		$remembered = $this->pidx_entries( $order );
 		unset( $remembered[ $pidx ] );
-		$remembered[ $pidx ] = (string) $this->order_paisa( $order );
+		$remembered[ $pidx ] = array(
+			'amount' => (string) $this->order_paisa( $order ),
+			'mode'   => $this->mode(),
+		);
 		$remembered          = array_slice( $remembered, -self::MAX_REMEMBERED_PIDXS, null, true );
 		$order->update_meta_data( self::META_PIDX, $pidx );
 		$order->update_meta_data( self::META_PIDXS, $remembered );
@@ -472,18 +487,119 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	 * @return array<string,string>
 	 */
 	public function remembered_pidxs( WC_Order $order ): array {
-		$stored     = $order->get_meta( self::META_PIDXS );
-		$remembered = array();
-		foreach ( is_array( $stored ) ? $stored : array() as $pidx => $amount ) {
-			if ( is_string( $pidx ) && '' !== $pidx && is_scalar( $amount ) ) {
-				$remembered[ $pidx ] = (string) $amount;
+		return wp_list_pluck( $this->pidx_entries( $order ), 'amount' );
+	}
+
+	/**
+	 * Every pidx minted for the order with its amount and mode, oldest first. The mode is ''
+	 * for entries stored before modes were recorded (checked in whatever mode is current).
+	 *
+	 * @param WC_Order $order Order.
+	 * @return array<string,array{amount:string,mode:string}>
+	 */
+	private function pidx_entries( WC_Order $order ): array {
+		$stored  = $order->get_meta( self::META_PIDXS );
+		$entries = array();
+		foreach ( is_array( $stored ) ? $stored : array() as $pidx => $entry ) {
+			if ( ! is_string( $pidx ) || '' === $pidx ) {
+				continue;
+			}
+			if ( is_scalar( $entry ) ) {
+				$entries[ $pidx ] = array(
+					'amount' => (string) $entry,
+					'mode'   => '',
+				);
+			} elseif ( is_array( $entry ) && is_scalar( $entry['amount'] ?? null ) ) {
+				$mode             = (string) ( $entry['mode'] ?? '' );
+				$entries[ $pidx ] = array(
+					'amount' => (string) $entry['amount'],
+					'mode'   => in_array( $mode, array( self::MODE_TEST, self::MODE_LIVE ), true ) ? $mode : '',
+				);
 			}
 		}
 		$current = (string) $order->get_meta( self::META_PIDX );
-		if ( '' !== $current && ! isset( $remembered[ $current ] ) ) {
-			$remembered[ $current ] = (string) $this->order_paisa( $order );
+		if ( '' !== $current && ! isset( $entries[ $current ] ) ) {
+			$entries[ $current ] = array(
+				'amount' => (string) $this->order_paisa( $order ),
+				'mode'   => '',
+			);
 		}
-		return $remembered;
+		return $entries;
+	}
+
+	/**
+	 * pidx values started in the other mode (test vs live). Khalti's sandbox and live systems
+	 * are separate, so these cannot be looked up now.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return array<string,string> pidx => mode it was started in.
+	 */
+	private function other_mode_pidxs( WC_Order $order ): array {
+		$out = array();
+		foreach ( $this->pidx_entries( $order ) as $pidx => $entry ) {
+			if ( '' !== $entry['mode'] && $this->mode() !== $entry['mode'] ) {
+				$out[ (string) $pidx ] = $entry['mode'];
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Adds one note per pidx started in the other mode, telling staff which dashboard to check.
+	 * The caller holds the lock and saves the order.
+	 *
+	 * @param WC_Order $order Order (fresh).
+	 * @return bool Whether a note was added.
+	 */
+	private function note_other_mode_pidxs( WC_Order $order ): bool {
+		$noted = $order->get_meta( self::META_MODE_NOTES );
+		$noted = is_array( $noted ) ? $noted : array();
+		$added = false;
+		foreach ( $this->other_mode_pidxs( $order ) as $pidx => $mode ) {
+			if ( isset( $noted[ $pidx ] ) ) {
+				continue;
+			}
+			$noted[ $pidx ] = gmdate( 'c' );
+			$added          = true;
+			$order->add_order_note(
+				sprintf(
+					self::MODE_TEST === $mode
+						/* translators: %s: Khalti pidx. */
+						? __( 'Khalti payment started in test mode — check the sandbox dashboard (test-admin.khalti.com). pidx: %s. The site is now in live mode, so this payment is not checked automatically and does not hold the order.', 'bookstore-nepal' )
+						/* translators: %s: Khalti pidx. */
+						: __( 'Khalti payment started in live mode — check the Khalti merchant dashboard (admin.khalti.com). pidx: %s. The site is now in test mode, so this payment is not checked automatically and does not hold the order.', 'bookstore-nepal' ),
+					$pidx
+				)
+			);
+		}
+		if ( $added ) {
+			$order->update_meta_data( self::META_MODE_NOTES, array_intersect_key( $noted, $this->pidx_entries( $order ) ) );
+		}
+		return $added;
+	}
+
+	/**
+	 * Notes pidx values started in the other mode, once each, under the lock (no wait).
+	 *
+	 * @param WC_Order $order Order (fresh).
+	 */
+	private function maybe_note_other_mode_pidxs( WC_Order $order ): void {
+		$noted = $order->get_meta( self::META_MODE_NOTES );
+		if ( ! array_diff_key( $this->other_mode_pidxs( $order ), is_array( $noted ) ? $noted : array() ) ) {
+			return; // Nothing new: no lock taken on the common path.
+		}
+		$lock = $this->lock( $order->get_id(), 0 );
+		if ( null === $lock ) {
+			return; // Next run.
+		}
+		try {
+			$fresh = $this->reload_order( $order->get_id() );
+			if ( null !== $fresh && $this->note_other_mode_pidxs( $fresh ) ) {
+				$fresh->save();
+			}
+		} finally {
+			$this->unlock( $lock );
+		}
 	}
 
 	/**
@@ -600,6 +716,13 @@ class KhaltiGateway extends WC_Payment_Gateway {
 			if ( self::ID !== $order->get_payment_method() ) {
 				wc_add_notice( $this->switched_notice(), 'error' ); // Switched meanwhile; the stray check covers it.
 				return wc_get_cart_url();
+			}
+			if ( isset( $this->other_mode_pidxs( $order )[ $known ] ) ) {
+				// Started in the other mode: never asked of the wrong Khalti environment.
+				if ( $this->note_other_mode_pidxs( $order ) ) {
+					$order->save();
+				}
+				return $this->not_confirmed( $order );
 			}
 			return $this->act_on_return( $order, $known, $this->lookup( $known ) );
 		} finally {
@@ -757,8 +880,8 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	 */
 	private function check_stray_return( int $order_id, string $pidx ): void {
 		$order = $this->reload_order( $order_id );
-		if ( null === $order || $order->get_meta( $this->verified_stray_key( $pidx ) ) ) {
-			return;
+		if ( null === $order || $order->get_meta( $this->verified_stray_key( $pidx ) ) || isset( $this->other_mode_pidxs( $order )[ $pidx ] ) ) {
+			return; // Already noted, or started in the other mode (the reconciler notes that).
 		}
 		$check = $this->lookup( $pidx );
 		$this->log_failed_check( $order_id, $pidx, $check );
@@ -942,6 +1065,13 @@ class KhaltiGateway extends WC_Payment_Gateway {
 		$order  = $this->reload_order( $order_id );
 		if ( null === $order || ! $this->has_key() ) {
 			return $result;
+		}
+		if ( $this->other_mode_pidxs( $order ) ) {
+			$this->maybe_note_other_mode_pidxs( $order );
+			$order = $this->reload_order( $order_id );
+			if ( null === $order ) {
+				return $result;
+			}
 		}
 		if ( self::ID !== $order->get_payment_method() ) {
 			$extra              = $this->check_unexpected_payments( $order, false );
@@ -1205,10 +1335,11 @@ class KhaltiGateway extends WC_Payment_Gateway {
 		}
 		$noted = $order->get_meta( self::META_STATUS_NOTES );
 		$noted = is_array( $noted ) ? $noted : array();
+		$other = $this->other_mode_pidxs( $order );
 		$out   = array();
 		foreach ( $this->remembered_pidxs( $order ) as $pidx => $amount ) {
 			$pidx = (string) $pidx;
-			if ( $pidx === $paid_pidx || ! empty( $noted[ $pidx ] ) || $order->get_meta( $this->verified_stray_key( $pidx ) ) ) {
+			if ( $pidx === $paid_pidx || isset( $other[ $pidx ] ) || ! empty( $noted[ $pidx ] ) || $order->get_meta( $this->verified_stray_key( $pidx ) ) ) {
 				continue;
 			}
 			$out[ $pidx ] = $amount;
@@ -1217,7 +1348,9 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * pidx values of an unpaid Khalti order still worth looking up: not in a final status.
+	 * pidx values of an unpaid Khalti order still worth looking up: started in the current
+	 * mode (or before modes were recorded) and not in a final status. With none left, the
+	 * order holds nothing back: WooCommerce's auto-cancel decides.
 	 *
 	 * @param WC_Order $order Order.
 	 * @return array<string,string> pidx => amount, oldest first.
@@ -1225,9 +1358,10 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	private function unchecked_pidxs( WC_Order $order ): array {
 		$noted = $order->get_meta( self::META_STATUS_NOTES );
 		$noted = is_array( $noted ) ? $noted : array();
+		$other = $this->other_mode_pidxs( $order );
 		$out   = array();
 		foreach ( $this->remembered_pidxs( $order ) as $pidx => $amount ) {
-			if ( array_intersect( self::FINAL_STATUSES, array_keys( (array) ( $noted[ $pidx ] ?? array() ) ) ) ) {
+			if ( isset( $other[ $pidx ] ) || array_intersect( self::FINAL_STATUSES, array_keys( (array) ( $noted[ $pidx ] ?? array() ) ) ) ) {
 				continue;
 			}
 			$out[ $pidx ] = $amount;
