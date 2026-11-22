@@ -15,24 +15,19 @@ defined( 'ABSPATH' ) || exit;
 define( 'BSN_VERSION', '0.1.0' );
 define( 'BSN_PLUGIN_FILE', __FILE__ );
 
-$bsn_autoload = __DIR__ . '/vendor/autoload.php';
-if ( file_exists( $bsn_autoload ) ) {
-	require_once $bsn_autoload;
-} else {
-	spl_autoload_register(
-		static function ( string $class_name ): void {
-			$prefix = 'BookstoreNepal\\';
-			if ( 0 !== strpos( $class_name, $prefix ) ) {
-				return;
-			}
-			$relative = str_replace( '\\', '/', substr( $class_name, strlen( $prefix ) ) );
-			$file     = __DIR__ . '/src/' . $relative . '.php';
-			if ( is_readable( $file ) ) {
-				require_once $file;
-			}
+spl_autoload_register(
+	static function ( string $class_name ): void {
+		$prefix = 'BookstoreNepal\\';
+		if ( 0 !== strpos( $class_name, $prefix ) ) {
+			return;
 		}
-	);
-}
+		$relative = str_replace( '\\', '/', substr( $class_name, strlen( $prefix ) ) );
+		$file     = __DIR__ . '/src/' . $relative . '.php';
+		if ( is_readable( $file ) ) {
+			require_once $file;
+		}
+	}
+);
 
 /**
  * Boots the plugin once WooCommerce has loaded.

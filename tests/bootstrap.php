@@ -49,7 +49,6 @@ tests_add_filter(
 		if ( ! class_exists( 'WC_Install' ) ) {
 			return;
 		}
-		define( 'WP_UNINSTALL_PLUGIN', true );
 		WC_Install::install();
 		// HPOS tables too, so tests can run against either order store.
 		wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\DataSynchronizer::class )->create_database_tables();

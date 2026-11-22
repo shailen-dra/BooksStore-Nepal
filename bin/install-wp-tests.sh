@@ -32,7 +32,7 @@ WP_CORE_FILE="$WP_CORE_DIR"/wp-settings.php
 
 download() {
     if command -v curl > /dev/null 2>&1; then
-        curl -L -s --retry 5 --retry-all-errors "$1" > "$2";
+        curl -L -s --retry 5 "$1" > "$2";
         return $?
     elif command -v wget > /dev/null 2>&1; then
         wget -nv -O "$2" "$1"
