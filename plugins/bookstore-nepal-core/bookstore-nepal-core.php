@@ -57,3 +57,4 @@ register_deactivation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Gateway\Esew
 add_action( 'bsn_booted', array( \BookstoreNepal\OrderStatuses::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Cli\SetupCommand::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\GiftFinder::class, 'register' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\ShopContact::class, 'register' ) );
