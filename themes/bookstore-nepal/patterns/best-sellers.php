@@ -18,9 +18,18 @@ defined( 'ABSPATH' ) || exit;
 <h2 class="wp-block-heading"><?php esc_html_e( 'Best sellers', 'bookstore-nepal' ); ?></h2>
 <!-- /wp:heading -->
 
-<!-- wp:paragraph {"className":"bsn-section__more"} -->
+<!-- wp:group {"className":"bsn-section__tools","layout":{"type":"flex","flexWrap":"wrap","verticalAlignment":"center"}} -->
+<div class="wp-block-group bsn-section__tools"><!-- wp:paragraph {"className":"bsn-section__more"} -->
 <p class="bsn-section__more"><a href="<?php echo esc_url( add_query_arg( 'orderby', 'popularity', Theme::shop_url() ) ); ?>"><?php esc_html_e( 'See all best sellers', 'bookstore-nepal' ); ?></a></p>
-<!-- /wp:paragraph --></div>
+<!-- /wp:paragraph -->
+
+<!-- wp:html -->
+<?php
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markup built and escaped by Theme.
+echo Theme::slider_controls( Theme::slider_id( 4 ) );
+?>
+<!-- /wp:html --></div>
+<!-- /wp:group --></div>
 <!-- /wp:group -->
 
 <?php
@@ -28,6 +37,7 @@ defined( 'ABSPATH' ) || exit;
 echo Theme::collection_markup(
 	array(
 		'query_id' => 4,
+		'slider'   => __( 'Best sellers', 'bookstore-nepal' ),
 		'query'    => array(
 			'orderBy'                => 'popularity',
 			'order'                  => 'desc',

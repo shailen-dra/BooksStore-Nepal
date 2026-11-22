@@ -648,4 +648,43 @@ class ThemeTest extends WP_UnitTestCase {
 			$this->assertStringNotContainsString( 'orders over', $html, $slug );
 		}
 	}
+
+	public function test_slider_collection_is_a_labelled_focusable_region(): void {
+		$html = Theme::collection_markup( array( 'query_id' => 1, 'slider' => 'New arrivals' ) );
+		$this->assertStringContainsString( 'bsn-slider', $html );
+		$this->assertStringContainsString( 'id="bsn-slider-1"', $html );
+		$this->assertStringContainsString( 'role="region"', $html );
+		$this->assertStringContainsString( 'aria-label="New arrivals"', $html );
+		$this->assertStringContainsString( 'tabindex="0"', $html );
+		$this->assertSame( 8, json_decode( explode( ' -->', explode( 'wp:woocommerce/product-collection ', $html )[1] )[0], true )['query']['perPage'] );
+	}
+
+	public function test_plain_collection_is_not_a_slider(): void {
+		$html = Theme::collection_markup( array( 'query_id' => 2 ) );
+		$this->assertStringNotContainsString( 'bsn-slider', $html );
+		$this->assertStringNotContainsString( 'role="region"', $html );
+		$this->assertStringNotContainsString( 'tabindex', $html );
+	}
+
+	public function test_slider_controls_are_hidden_labelled_buttons_for_the_row(): void {
+		$html = Theme::slider_controls( 'bsn-slider-1' );
+		$this->assertSame( 2, substr_count( $html, '<button type="button"' ) );
+		$this->assertSame( 2, substr_count( $html, ' hidden' ) );
+		$this->assertSame( 2, substr_count( $html, 'aria-controls="bsn-slider-1"' ) );
+		$this->assertStringContainsString( 'aria-label="Previous books"', $html );
+		$this->assertStringContainsString( 'aria-label="Next books"', $html );
+		$this->assertStringContainsString( 'data-bsn-slider-prev', $html );
+		$this->assertStringContainsString( 'data-bsn-slider-next', $html );
+	}
+
+	public function test_slider_patterns_use_sliders_and_featured_stays_a_grid(): void {
+		$this->assertSame( 'bsn-slider-1', Theme::slider_id( 1 ) );
+		foreach ( array( 'new-arrivals' => 'New arrivals', 'best-sellers' => 'Best sellers' ) as $slug => $label ) {
+			$html = $this->render_pattern( $slug );
+			$this->assertStringContainsString( 'role="region"', $html, $slug );
+			$this->assertStringContainsString( 'aria-label="' . $label . '"', $html, $slug );
+			$this->assertStringContainsString( 'data-bsn-slider-next', $html, $slug );
+		}
+		$this->assertStringNotContainsString( 'bsn-slider', $this->render_pattern( 'featured-books' ) );
+	}
 }

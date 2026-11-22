@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.3';
+	public const VERSION = '0.1.4';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -76,6 +76,36 @@ final class Theme {
 	public static function enqueue(): void {
 		wp_enqueue_style( 'bsn-theme', get_stylesheet_uri(), array(), self::VERSION );
 		wp_style_add_data( 'bsn-theme', 'path', get_stylesheet_directory() . '/style.css' );
+		if ( is_front_page() ) {
+			wp_enqueue_script( 'bsn-slider', get_stylesheet_directory_uri() . '/assets/js/slider.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
+		}
+	}
+
+	/**
+	 * Element ID of a slider's scrolling row.
+	 *
+	 * @param int $query_id Product Collection query ID.
+	 */
+	public static function slider_id( int $query_id ): string {
+		return 'bsn-slider-' . $query_id;
+	}
+
+	/**
+	 * Previous/next buttons for a slider; hidden until slider.js shows them.
+	 *
+	 * @param string $row_id ID of the scrolling row.
+	 */
+	public static function slider_controls( string $row_id ): string {
+		$icon  = '<svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 20 20"><path d="%s" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+		$items = array(
+			'prev' => array( esc_attr__( 'Previous books', 'bookstore-nepal' ), 'M12.5 4 6.5 10l6 6' ),
+			'next' => array( esc_attr__( 'Next books', 'bookstore-nepal' ), 'M7.5 4l6 6-6 6' ),
+		);
+		$html  = '<div class="bsn-slider-controls">';
+		foreach ( $items as $dir => $item ) {
+			$html .= '<button type="button" class="bsn-slider-btn" data-bsn-slider-' . $dir . ' aria-label="' . $item[0] . '" aria-controls="' . esc_attr( $row_id ) . '" hidden>' . sprintf( $icon, $item[1] ) . '</button>';
+		}
+		return $html . '</div>';
 	}
 
 	/**
@@ -718,6 +748,7 @@ final class Theme {
 	 *     @type int    $heading_level Card title heading level.
 	 *     @type bool   $pagination    Whether to render pagination and the no-results message.
 	 *     @type string $class         Extra class.
+	 *     @type string $slider        Accessible name; when set the row is a horizontal slider.
 	 * }
 	 */
 	public static function collection_markup( array $args ): string {
@@ -729,6 +760,7 @@ final class Theme {
 				'heading_level' => 3,
 				'pagination'    => false,
 				'class'         => '',
+				'slider'        => '',
 			),
 			$args
 		);
@@ -753,7 +785,11 @@ final class Theme {
 			),
 			$args['query']
 		);
-		$class = trim( 'bsn-products ' . $args['class'] );
+		$class = trim( 'bsn-products ' . $args['class'] . ( '' !== $args['slider'] ? ' bsn-slider' : '' ) );
+		$wrap  = '';
+		if ( '' !== $args['slider'] ) {
+			$wrap = ' id="' . esc_attr( self::slider_id( (int) $args['query_id'] ) ) . '" role="region" aria-label="' . esc_attr( $args['slider'] ) . '" tabindex="0"';
+		}
 		$attrs = array(
 			'queryId'              => (int) $args['query_id'],
 			'query'                => $query,
@@ -790,7 +826,7 @@ final class Theme {
 		}
 
 		return '<!-- wp:woocommerce/product-collection ' . serialize_block_attributes( $attrs ) . ' -->
-<div class="wp-block-woocommerce-product-collection alignwide ' . esc_attr( $class ) . '">' . $inner . '</div>
+<div class="wp-block-woocommerce-product-collection alignwide ' . esc_attr( $class ) . '"' . $wrap . '>' . $inner . '</div>
 <!-- /wp:woocommerce/product-collection -->';
 	}
 }
