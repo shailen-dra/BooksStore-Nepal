@@ -4,8 +4,12 @@ use BookstoreNepal\Gateway\EsewaGateway;
 use BookstoreNepal\Gateway\EsewaSignature;
 
 class EsewaGatewayTest extends WP_UnitTestCase {
+	use RestoresGlobalState;
 
 	private const TEST_SECRET = '8gBm/:&EnhH.1/q';
+
+	/** @var bool Whether a test rebuilt WooCommerce's gateway objects from its own settings. */
+	private $gateways_reloaded = false;
 
 	/** @var EsewaGateway */
 	private $gateway;
@@ -51,6 +55,12 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 	public function tear_down(): void {
 		remove_filter( 'pre_http_request', array( $this, 'mock_http' ), 10 );
 		parent::tear_down();
+		if ( $this->gateways_reloaded ) {
+			// Rebuild from the rolled-back settings; the options cache holds this test's values until flushed.
+			$this->gateways_reloaded = false;
+			wp_cache_flush();
+			$this->reload_payment_gateways();
+		}
 	}
 
 	public function mock_http( $pre, $args, $url ) {
@@ -565,6 +575,9 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 
 	public function test_gateway_registered_and_blocks_integration(): void {
 		$this->assertContains( EsewaGateway::class, apply_filters( 'woocommerce_payment_gateways', array() ) );
+		// EsewaBlocks uses WooCommerce's gateway object, which another test may have built with eSewa off.
+		$this->gateways_reloaded = true;
+		$this->reload_payment_gateways();
 		$blocks = new EsewaBlocks();
 		$blocks->initialize();
 		$this->assertSame( 'esewa', $blocks->get_name() );

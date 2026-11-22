@@ -8,6 +8,7 @@
 use BookstoreNepal\Shipping;
 
 class StoreApiCheckoutTest extends WP_UnitTestCase {
+	use RestoresGlobalState;
 
 	/** @var mixed Cash on delivery settings before the test. */
 	private $cod_settings;
@@ -30,7 +31,7 @@ class StoreApiCheckoutTest extends WP_UnitTestCase {
 			)
 		);
 		// Gateways read their settings when built, so rebuild them with COD enabled.
-		WC()->payment_gateways()->init();
+		$this->reload_payment_gateways();
 		Shipping::install();
 		add_filter( 'woocommerce_store_api_disable_nonce_check', '__return_true' );
 
@@ -38,6 +39,8 @@ class StoreApiCheckoutTest extends WP_UnitTestCase {
 			wc_load_cart();
 		}
 		WC()->cart->empty_cart();
+		// The Store API turns error notices left in the session by other tests into cart errors.
+		wc_clear_notices();
 		$product = new WC_Product_Simple();
 		$product->set_name( 'Muna Madan' );
 		$product->set_regular_price( '500' );
@@ -55,7 +58,8 @@ class StoreApiCheckoutTest extends WP_UnitTestCase {
 		} else {
 			update_option( 'woocommerce_cod_settings', $this->cod_settings );
 		}
-		WC()->payment_gateways()->init();
+		$this->reload_payment_gateways();
+		wc_clear_notices();
 		parent::tear_down();
 	}
 

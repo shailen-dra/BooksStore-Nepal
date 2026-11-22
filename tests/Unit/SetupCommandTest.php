@@ -5,15 +5,18 @@ use Automattic\WooCommerce\Blocks\Domain\Services\CoreCheckoutFields;
 use Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils;
 
 class SetupCommandTest extends WP_UnitTestCase {
+	use RestoresGlobalState;
 
 	public function set_up(): void {
 		parent::set_up();
-		// The DB rolls back between tests but registered taxonomies do not.
-		foreach ( array( 'age-group', 'language', 'book-type' ) as $slug ) {
-			unregister_taxonomy( 'pa_' . $slug );
-		}
-		delete_transient( 'wc_attribute_taxonomies' );
-		WC_Cache_Helper::invalidate_cache_group( 'woocommerce-attributes' );
+		$this->save_attribute_taxonomies();
+		$this->save_permalink_structure();
+	}
+
+	public function tear_down(): void {
+		$this->restore_permalink_structure();
+		$this->restore_attribute_taxonomies();
+		parent::tear_down();
 	}
 
 	/**

@@ -2,15 +2,24 @@
 use BookstoreNepal\Catalog;
 
 class CatalogTest extends WP_UnitTestCase {
+	use RestoresGlobalState;
+
+	/** @var string|false|null error_log setting to restore, when a test silenced it. */
+	private $silenced = null;
 
 	public function set_up(): void {
 		parent::set_up();
-		// The DB rolls back between tests but registered taxonomies do not.
-		foreach ( array( 'age-group', 'language', 'book-type' ) as $slug ) {
-			unregister_taxonomy( 'pa_' . $slug );
+		$this->save_attribute_taxonomies();
+	}
+
+	public function tear_down(): void {
+		if ( null !== $this->silenced ) {
+			ini_set( 'error_log', (string) $this->silenced ); // phpcs:ignore
+			$this->silenced = null;
 		}
-		delete_transient( 'wc_attribute_taxonomies' );
-		WC_Cache_Helper::invalidate_cache_group( 'woocommerce-attributes' );
+		// Also drops the pa_language the attribute-failure test registers.
+		$this->restore_attribute_taxonomies();
+		parent::tear_down();
 	}
 
 	public function test_install_creates_three_global_attributes(): void {
@@ -89,17 +98,6 @@ class CatalogTest extends WP_UnitTestCase {
 		ini_set( 'error_log', sys_get_temp_dir() . '/bsn-test-error.log' ); // phpcs:ignore
 		$this->silenced = $old;
 	}
-
-	public function tear_down(): void {
-		if ( null !== $this->silenced ) {
-			ini_set( 'error_log', (string) $this->silenced ); // phpcs:ignore
-			$this->silenced = null;
-		}
-		parent::tear_down();
-	}
-
-	/** @var string|false|null */
-	private $silenced = null;
 
 	public function test_install_returns_empty_array_on_success(): void {
 		$this->assertSame( array(), Catalog::install() );

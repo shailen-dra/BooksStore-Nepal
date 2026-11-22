@@ -10,15 +10,12 @@ require_once dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/inc/Theme.php';
  * The child theme's helpers and filters. The theme is not activated; its class is loaded directly.
  */
 class ThemeTest extends WP_UnitTestCase {
+	use RestoresGlobalState;
 
 	public function set_up(): void {
 		parent::set_up();
-		// The DB rolls back between tests but registered taxonomies do not.
-		foreach ( array( 'age-group', 'language', 'book-type' ) as $slug ) {
-			unregister_taxonomy( 'pa_' . $slug );
-		}
-		delete_transient( 'wc_attribute_taxonomies' );
-		WC_Cache_Helper::invalidate_cache_group( 'woocommerce-attributes' );
+		$this->save_attribute_taxonomies();
+		$this->save_shortcodes();
 		Theme::flush_rates();
 	}
 
@@ -26,12 +23,16 @@ class ThemeTest extends WP_UnitTestCase {
 		remove_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
 		unset( $GLOBALS['product'] );
 		Theme::flush_rates();
+		$this->restore_shortcodes();
+		$this->restore_attribute_taxonomies();
 		parent::tear_down();
 		if ( $this->gateways_changed ) {
-			// Reload gateways from the rolled-back settings so later tests see the original state.
+			// Reload gateways from the rolled-back settings so later tests see the original state;
+			// the options cache still holds this test's values until it is flushed.
 			$this->fake_khalti      = null;
 			$this->gateways_changed = false;
-			WC()->payment_gateways()->init();
+			wp_cache_flush();
+			$this->reload_payment_gateways();
 		}
 	}
 
@@ -297,7 +298,7 @@ class ThemeTest extends WP_UnitTestCase {
 			};
 			add_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
 		}
-		WC()->payment_gateways()->init();
+		$this->reload_payment_gateways();
 	}
 
 	private function render_pattern( string $slug ): string {
@@ -333,7 +334,7 @@ class ThemeTest extends WP_UnitTestCase {
 	public function test_payment_methods_skip_esewa_that_cannot_take_payments(): void {
 		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ) );
 		update_option( 'woocommerce_esewa_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'product_code' => '', 'secret_key' => '' ) );
-		WC()->payment_gateways()->init();
+		$this->reload_payment_gateways();
 		$this->assertSame( array( 'cod' ), array_keys( Theme::payment_methods() ) );
 	}
 

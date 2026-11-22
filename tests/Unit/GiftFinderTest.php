@@ -2,6 +2,28 @@
 use BookstoreNepal\GiftFinder;
 
 class GiftFinderTest extends WP_UnitTestCase {
+	use RestoresGlobalState;
+
+	/** @var array|null Product post type archive settings before enable_product_archive(). */
+	private $saved_archive = null;
+
+	public function set_up(): void {
+		parent::set_up();
+		$this->save_permalink_structure();
+		$this->save_shortcodes();
+	}
+
+	public function tear_down(): void {
+		if ( null !== $this->saved_archive ) {
+			global $wp_post_types;
+			$wp_post_types['product']->has_archive = $this->saved_archive['has_archive'];
+			$wp_post_types['product']->rewrite     = $this->saved_archive['rewrite'];
+			$this->saved_archive                   = null;
+		}
+		$this->restore_permalink_structure();
+		$this->restore_shortcodes();
+		parent::tear_down();
+	}
 
 	private function parts( string $url ): array {
 		parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $q );
@@ -56,6 +78,10 @@ class GiftFinderTest extends WP_UnitTestCase {
 	 */
 	private function enable_product_archive(): void {
 		global $wp_post_types;
+		$this->saved_archive                   = array(
+			'has_archive' => $wp_post_types['product']->has_archive,
+			'rewrite'     => $wp_post_types['product']->rewrite,
+		);
 		$wp_post_types['product']->has_archive = 'shop';
 		$wp_post_types['product']->rewrite     = array( 'slug' => 'shop', 'with_front' => false, 'feeds' => true, 'pages' => true, 'ep_mask' => EP_PERMALINK );
 	}

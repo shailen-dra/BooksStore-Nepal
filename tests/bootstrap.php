@@ -58,3 +58,5 @@ tests_add_filter(
 );
 
 require $bsn_tests_dir . '/includes/bootstrap.php';
+
+require_once __DIR__ . '/Support/RestoresGlobalState.php';
