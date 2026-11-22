@@ -71,7 +71,7 @@ Never commit payment keys. Enter them only in the live site's wp-admin.
 2. Go to **WooCommerce › Settings › Payments** and open **eSewa**.
 3. Enter **Live product code** and **Live secret key**.
    ![eSewa settings](admin-guide/08-esewa.png)
-4. **Untick Test mode** ("Use the eSewa sandbox"). While test mode is ticked, the live code and secret are ignored and the sandbox (product code `EPAYTEST`) is used, so real money is never taken.
+4. **Untick Test mode** ("Use the eSewa sandbox"). While test mode is ticked, the live code and secret are ignored and the sandbox (product code `EPAYTEST`) is used, so real money is never taken. Enter the live code and secret first: while test mode is off without them, eSewa is hidden at checkout and unpaid eSewa orders are **not** cancelled automatically (the website cannot check them).
 5. Tick **Enable eSewa** and click **Save changes**.
 6. Place a real low-value order with eSewa and confirm the order moves to **Processing**. Refund it in eSewa afterwards.
 
@@ -100,7 +100,7 @@ Khalti (Web Checkout, KPG-2) is a gateway in our plugin, shown in the block chec
 1. Get the **live secret key** from the client's Khalti merchant dashboard (https://admin.khalti.com).
 2. Go to **WooCommerce › Settings › Payments** and open **Khalti** (our gateway; its settings page is `section=bsn_khalti`).
 3. Enter the **Live secret key**.
-4. **Untick Test mode**. While test mode is ticked, the live key is ignored and the sandbox (`dev.khalti.com`) is used with the **Test secret key**.
+4. **Untick Test mode**. While test mode is ticked, the live key is ignored and the sandbox (`dev.khalti.com`) is used with the **Test secret key**. Enter the live key first: while the current mode has no key, Khalti is hidden at checkout and unpaid Khalti orders are **not** cancelled automatically (the website cannot check them). Payments started in test mode are not checked once live mode is on (and the reverse); each such order gets a note saying which Khalti dashboard to check.
 5. Tick **Enable Khalti** and click **Save changes**. Khalti only appears at checkout when the store currency is NPR and the key for the current mode is filled in.
 6. Place a real low-value order with Khalti (Khalti's minimum is NPR 10) and confirm the order moves to **Processing**. Refund it in the Khalti merchant dashboard afterwards.
 
