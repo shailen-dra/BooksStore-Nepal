@@ -78,6 +78,22 @@ Never commit payment keys. Enter them only in the live site's wp-admin.
 5. Tick **Enable eSewa** and click **Save changes**.
 6. Place a real low-value order with eSewa and confirm the order moves to **Processing**. Refund it in eSewa afterwards.
 
+#### Scheduled tasks (WP-Cron / Action Scheduler)
+
+The eSewa automatic payment check runs every 5 minutes through Action Scheduler (part of WooCommerce), as do WooCommerce's own jobs such as cancelling unpaid orders and sending deferred emails. Action Scheduler is started by WP-Cron, and WP-Cron by default only runs when someone visits the site, so on a quiet site the check can be late. On the live server:
+
+1. Add `define( 'DISABLE_WP_CRON', true );` to `wp-config.php`.
+2. Add a system cron job that runs every minute, either:
+   ```bash
+   * * * * * curl -fsS https://CLIENT-DOMAIN/wp-cron.php?doing_wp_cron > /dev/null
+   ```
+   or, with WP-CLI on the server:
+   ```bash
+   * * * * * cd /path/to/wordpress && wp action-scheduler run --quiet
+   ```
+
+To check it is working, open **WooCommerce › Status › Scheduled Actions**, search for `bsn_esewa_reconcile` (group `bsn`): there should be one **Pending** action due within 5 minutes, and the **Complete** list should show recent runs. From the command line: `wp action-scheduler action list --hook=bsn_esewa_reconcile`. The action is created automatically (on the next wp-admin, cron or WP-CLI request) after the plugin is activated, and removed when the plugin is deactivated. If eSewa's status API cannot be reached, a line starting "Bookstore Nepal eSewa: automatic check of order" is written to the PHP error log (or `wp-content/debug.log` when debug logging is on) and the order is checked again on the next run.
+
 Test mode is on by default. Check this setting before launch and after any restore of a staging database onto the live site.
 
 ### Khalti status
@@ -95,6 +111,7 @@ Enabled by the first `wp bsn setup` run. Later runs do not touch it, so if the o
 - Place one order each with cash on delivery to a Kathmandu Valley address and to another district. Check the delivery price, the order email and the order in **WooCommerce › Orders**.
 - Place an order over NPR 2,000 (or the client's free-delivery amount) and confirm delivery is free.
 - Confirm an out-of-stock book cannot be added to the cart.
+- Confirm the `bsn_esewa_reconcile` scheduled action is pending and has recent completed runs (see "Scheduled tasks" in section 3).
 - Confirm the site is **Live** (Site visibility), HTTPS works with no mixed-content warnings, and the footer has no `[CLIENT ...]` placeholders.
 - Delete or set to draft any sample or test books and test orders.
 
