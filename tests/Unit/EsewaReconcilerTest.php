@@ -535,4 +535,117 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		}
 		$this->assertNotFalse( as_next_scheduled_action( EsewaReconciler::HOOK, array(), 'bsn' ) );
 	}
+
+	/**
+	 * Asks WooCommerce's unpaid-order auto-cancel whether to cancel this order.
+	 */
+	private function should_cancel( WC_Order $order, bool $cancel = true ): bool {
+		return (bool) apply_filters( 'woocommerce_cancel_unpaid_order', $cancel, $order );
+	}
+
+	public function test_auto_cancel_completes_order_esewa_says_is_paid(): void {
+		$order = $this->order( 90 );
+		$this->statuses[ $this->uuid( $order ) ] = 'COMPLETE';
+		$this->assertFalse( $this->should_cancel( $order ) );
+		$order = $this->fresh( $order );
+		$this->assertSame( 'processing', $order->get_status() );
+		$this->assertSame( 9, $this->stock() );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'Payment confirmed by eSewa status check (customer did not return to the site). Ref: 0007G36' ) );
+	}
+
+	public function test_auto_cancel_waits_when_esewa_cannot_say(): void {
+		$order = $this->order( 90 );
+		$notes = $this->note_texts( $order );
+		$this->statuses[ $this->uuid( $order ) ] = new WP_Error( 'http_request_failed', 'Operation timed out' );
+		$this->assertFalse( $this->should_cancel( $order ), 'API error: not cancelled now.' );
+		$this->assert_untouched( $order, $notes );
+
+		// The API is down for this request: other eSewa orders are not cancelled either, without more requests.
+		$second = $this->order( 90 );
+		$this->statuses[ $this->uuid( $second ) ] = 'NOT_FOUND';
+		$this->assertFalse( $this->should_cancel( $second ) );
+		$this->assertCount( 1, $this->requested );
+
+		EsewaReconciler::reset_request_state();
+		$this->statuses[ $this->uuid( $order ) ] = 'PENDING';
+		$this->assertFalse( $this->should_cancel( $order ), 'PENDING: not cancelled now.' );
+		$this->assert_untouched( $order, $notes );
+	}
+
+	public function test_auto_cancel_goes_ahead_when_esewa_has_no_payment(): void {
+		$order = $this->order( 90 );
+		$this->statuses[ $this->uuid( $order ) ] = 'NOT_FOUND';
+		$this->assertTrue( $this->should_cancel( $order ) );
+		$this->assertFalse( $this->should_cancel( $order, false ), 'Original value kept.' );
+		$this->assertFalse( $this->fresh( $order )->is_paid() );
+	}
+
+	public function test_auto_cancel_of_complete_with_wrong_amount_waits_for_staff(): void {
+		$order = $this->order( 90 );
+		$this->statuses[ $this->uuid( $order ) ] = array(
+			'status' => 'COMPLETE',
+			'amount' => 100.0,
+		);
+		$this->assertFalse( $this->should_cancel( $order ) );
+		$this->assertFalse( $this->fresh( $order )->is_paid() );
+	}
+
+	public function test_auto_cancel_leaves_other_orders_alone(): void {
+		$order = $this->order( 90 );
+		$order = $this->switch_to_cod( $order );
+		$this->statuses[ $this->uuid( $order ) ] = 'COMPLETE';
+		$this->assertTrue( $this->should_cancel( $order ) );
+		$this->assertFalse( $this->should_cancel( $order, false ) );
+
+		$plain = wc_create_order();
+		$plain->set_payment_method( 'cod' );
+		$plain->save();
+		$this->assertTrue( $this->should_cancel( $plain ) );
+		$this->assertSame( array(), $this->requested );
+		$this->assertFalse( $this->fresh( $order )->is_paid() );
+	}
+
+	public function test_auto_cancel_not_asked_to_cancel_makes_no_request(): void {
+		$order = $this->order( 90 );
+		$this->statuses[ $this->uuid( $order ) ] = 'COMPLETE';
+		$this->assertFalse( $this->should_cancel( $order, false ) );
+		$this->assertSame( array(), $this->requested, 'The scheduled check will complete it.' );
+	}
+
+	public function test_woocommerce_unpaid_order_cron_does_not_cancel_paid_esewa_order(): void {
+		update_option( 'woocommerce_hold_stock_minutes', '60' );
+		$paid   = $this->order( 90 );
+		$unpaid = $this->order( 90 );
+		$this->statuses[ $this->uuid( $paid ) ]   = 'COMPLETE';
+		$this->statuses[ $this->uuid( $unpaid ) ] = 'NOT_FOUND';
+		$this->age_last_update( $paid, 90 );
+		$this->age_last_update( $unpaid, 90 );
+
+		wc_cancel_unpaid_orders();
+
+		$this->assertSame( 'processing', $this->fresh( $paid )->get_status() );
+		$this->assertSame( 'cancelled', $this->fresh( $unpaid )->get_status() );
+		$this->assertSame( 9, $this->stock(), 'Paid order keeps its stock; the cancelled one is restocked.' );
+	}
+
+	/**
+	 * Backdates an order's last-modified time, which WooCommerce's auto-cancel goes by.
+	 */
+	private function age_last_update( WC_Order $order, int $minutes ): void {
+		global $wpdb;
+		$gmt = gmdate( 'Y-m-d H:i:s', time() - $minutes * MINUTE_IN_SECONDS );
+		if ( \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled() ) {
+			$wpdb->update( $wpdb->prefix . 'wc_orders', array( 'date_updated_gmt' => $gmt ), array( 'id' => $order->get_id() ) );
+		} else {
+			$wpdb->update(
+				$wpdb->posts,
+				array(
+					'post_modified_gmt' => $gmt,
+					'post_modified'     => get_date_from_gmt( $gmt ),
+				),
+				array( 'ID' => $order->get_id() )
+			);
+		}
+		$this->evict( $order->get_id() );
+	}
 }

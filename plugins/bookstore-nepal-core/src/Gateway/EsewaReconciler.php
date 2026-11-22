@@ -47,6 +47,38 @@ class EsewaReconciler {
 		add_action( 'init', array( self::class, 'maybe_schedule' ), 20 );
 		add_action( self::HOOK, array( self::class, 'run' ) );
 		add_action( 'woocommerce_before_order_object_save', array( self::class, 'flag_switched_order' ) );
+		add_filter( 'woocommerce_cancel_unpaid_order', array( self::class, 'filter_cancel_unpaid_order' ), 10, 2 );
+	}
+
+	/**
+	 * Guards WooCommerce's auto-cancel of unpaid orders (which also restocks): before an eSewa
+	 * order is cancelled, ask eSewa. Paid → complete it instead; eSewa undecided, unreachable or
+	 * paid for a different amount → don't cancel now (the scheduled check decides later); no
+	 * payment → WooCommerce's decision stands.
+	 *
+	 * @param mixed $cancel Whether WooCommerce will cancel the order.
+	 * @param mixed $order  The unpaid order.
+	 * @return mixed
+	 */
+	public static function filter_cancel_unpaid_order( $cancel, $order ) {
+		// Not being cancelled anyway: no request needed, the scheduled check covers it.
+		if ( ! $cancel || ! $order instanceof WC_Order || EsewaGateway::ID !== $order->get_payment_method() ) {
+			return $cancel;
+		}
+		if ( self::$api_unavailable ) {
+			return false;
+		}
+		$result = EsewaGateway::instance()->reconcile( $order->get_id() );
+		if ( $result['api_error'] ) {
+			self::$api_unavailable = true;
+		}
+		$keep = array(
+			EsewaGateway::RECONCILE_PAID,
+			EsewaGateway::RECONCILE_ALREADY_PAID,
+			EsewaGateway::RECONCILE_RETRY,
+			EsewaGateway::RECONCILE_MISMATCH,
+		);
+		return in_array( $result['outcome'], $keep, true ) ? false : $cancel;
 	}
 
 	/**
