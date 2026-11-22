@@ -13,9 +13,6 @@
 
 namespace BookstoreNepal\Gateway;
 
-use Automattic\WooCommerce\Caches\OrderCache;
-use Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore;
-use Automattic\WooCommerce\Utilities\OrderUtil;
 use WC_Order;
 use WC_Payment_Gateway;
 
@@ -25,6 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * eSewa wallet payments.
  */
 class EsewaGateway extends WC_Payment_Gateway {
+	use LocksOrders;
 
 	public const ID                = 'esewa';
 	public const API_ACTION        = 'bsn_esewa';
@@ -1141,26 +1139,6 @@ class EsewaGateway extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * Loads an order bypassing request-local caches: WooCommerce's order object cache
-	 * (HPOS), the HPOS datastore cache, and the post/meta caches (CPT store). Without
-	 * this, a request that waited for the lock would see the order as it was before
-	 * the other request paid it, and pay or fail it a second time.
-	 *
-	 * @param int $order_id Order ID.
-	 */
-	private function reload_order( int $order_id ): ?WC_Order {
-		if ( class_exists( OrderCache::class ) ) {
-			wc_get_container()->get( OrderCache::class )->remove( $order_id );
-		}
-		if ( OrderUtil::custom_orders_table_usage_is_enabled() && class_exists( OrdersTableDataStore::class ) ) {
-			wc_get_container()->get( OrdersTableDataStore::class )->clear_cached_data( array( $order_id ) );
-		}
-		clean_post_cache( $order_id );
-		$order = wc_get_order( $order_id );
-		return $order instanceof WC_Order ? $order : null;
-	}
-
-	/**
 	 * Serialises callbacks for one order (MySQL named lock), so a double submit
 	 * cannot complete the order twice.
 	 *
@@ -1169,8 +1147,6 @@ class EsewaGateway extends WC_Payment_Gateway {
 	 * @return string|null Lock name when held.
 	 */
 	private function lock( int $order_id, ?int $timeout = null ): ?string {
-		global $wpdb;
-		$name = 'bsn_esewa_' . $order_id;
 		if ( null === $timeout ) {
 			/**
 			 * Seconds to wait for another callback on the same order to finish.
@@ -1179,18 +1155,6 @@ class EsewaGateway extends WC_Payment_Gateway {
 			 */
 			$timeout = (int) apply_filters( 'bsn_esewa_lock_timeout', self::STATUS_TIMEOUT + 5 );
 		}
-		$timeout = max( 0, $timeout );
-		$got     = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, $timeout ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		return '1' === (string) $got ? $name : null;
-	}
-
-	/**
-	 * Releases a lock taken by lock().
-	 *
-	 * @param string $name Lock name.
-	 */
-	private function unlock( string $name ): void {
-		global $wpdb;
-		$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $name ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		return $this->acquire_lock( 'bsn_esewa_' . $order_id, $timeout );
 	}
 }
