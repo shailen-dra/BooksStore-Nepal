@@ -263,6 +263,64 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 		$this->assertSame( $order->get_checkout_payment_url( true ), $result['redirect'] );
 	}
 
+	public function test_every_minted_uuid_is_remembered_with_its_amount(): void {
+		$order = $this->order();
+		$first = (string) $order->get_meta( EsewaGateway::META_UUID );
+		$this->assertSame( array( $first => '500' ), $order->get_meta( EsewaGateway::META_UUIDS ) );
+
+		// The customer comes back and tries again a few seconds later: a new UUID is minted.
+		$order->update_meta_data( EsewaGateway::META_UUID, $order->get_id() . '-1700000000' );
+		$order->update_meta_data( EsewaGateway::META_UUIDS, array( $order->get_id() . '-1700000000' => '500' ) );
+		$order->save();
+		$this->gateway->process_payment( $order->get_id() );
+		$order  = $this->fresh( $order );
+		$second = (string) $order->get_meta( EsewaGateway::META_UUID );
+		$this->assertNotSame( $order->get_id() . '-1700000000', $second );
+		$this->assertSame(
+			array(
+				$order->get_id() . '-1700000000' => '500',
+				$second                          => '500',
+			),
+			$order->get_meta( EsewaGateway::META_UUIDS )
+		);
+		$this->assertSame( array( $order->get_id() . '-1700000000', $second ), array_keys( $this->gateway->remembered_uuids( $order ) ) );
+	}
+
+	public function test_uuid_minted_by_receipt_page_is_remembered(): void {
+		$order = $this->order();
+		$order->delete_meta_data( EsewaGateway::META_UUID );
+		$order->delete_meta_data( EsewaGateway::META_UUIDS );
+		$order->save();
+		$form = $this->gateway->form_fields_for( $this->fresh( $order ) );
+		$this->assertSame( array( $form['transaction_uuid'] => '500' ), $this->fresh( $order )->get_meta( EsewaGateway::META_UUIDS ) );
+	}
+
+	public function test_uuid_from_before_the_list_existed_is_remembered(): void {
+		$order = $this->order();
+		$order->delete_meta_data( EsewaGateway::META_UUIDS );
+		$order->update_meta_data( EsewaGateway::META_UUID, $order->get_id() . '-1700000000' );
+		$order->save();
+		$this->assertSame( array( $order->get_id() . '-1700000000' => '500' ), $this->gateway->remembered_uuids( $this->fresh( $order ) ) );
+	}
+
+	public function test_remembered_uuids_are_capped_dropping_the_oldest(): void {
+		$order = $this->order();
+		$list  = array();
+		for ( $i = 1; $i <= EsewaGateway::MAX_REMEMBERED_UUIDS; $i++ ) {
+			$list[ $order->get_id() . '-' . ( 1700000000 + $i ) ] = '500';
+		}
+		$order->update_meta_data( EsewaGateway::META_UUIDS, $list );
+		$order->save();
+		$this->gateway->process_payment( $order->get_id() );
+
+		$order      = $this->fresh( $order );
+		$remembered = $order->get_meta( EsewaGateway::META_UUIDS );
+		$this->assertCount( EsewaGateway::MAX_REMEMBERED_UUIDS, $remembered );
+		$this->assertArrayNotHasKey( $order->get_id() . '-1700000001', $remembered, 'Oldest dropped.' );
+		$this->assertArrayHasKey( $order->get_id() . '-1700000002', $remembered );
+		$this->assertArrayHasKey( (string) $order->get_meta( EsewaGateway::META_UUID ), $remembered, 'Newest kept.' );
+	}
+
 	public function test_receipt_form_posts_signed_fields_to_test_form_url(): void {
 		$order = $this->order();
 		$uuid  = $order->get_meta( EsewaGateway::META_UUID );

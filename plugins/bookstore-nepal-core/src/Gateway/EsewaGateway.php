@@ -29,6 +29,9 @@ class EsewaGateway extends WC_Payment_Gateway {
 	public const ID                = 'esewa';
 	public const API_ACTION        = 'bsn_esewa';
 	public const META_UUID         = '_bsn_esewa_uuid';
+	// Every UUID minted for the order (uuid => amount sent to eSewa), oldest first, so the
+	// reconciler can find a payment made on an earlier attempt.
+	public const META_UUIDS        = '_bsn_esewa_uuids';
 	public const META_REF_ID       = '_bsn_esewa_ref_id';
 	public const META_STRAY_PREFIX = '_bsn_esewa_stray_';
 	public const TEST_PRODUCT_CODE = 'EPAYTEST';
@@ -42,6 +45,8 @@ class EsewaGateway extends WC_Payment_Gateway {
 	// Fields that must be covered by the callback signature before we read them.
 	public const CALLBACK_SIGNED = array( 'transaction_code', 'status', 'total_amount', 'transaction_uuid', 'product_code' );
 	public const STATUS_TIMEOUT  = 15;
+	// Customers retry rarely; the cap bounds status-API calls per order per reconciliation run.
+	public const MAX_REMEMBERED_UUIDS = 20;
 
 	/**
 	 * Hooks the gateway into WooCommerce.
@@ -218,12 +223,52 @@ class EsewaGateway extends WC_Payment_Gateway {
 			wc_add_notice( __( 'Order not found.', 'bookstore-nepal' ), 'error' );
 			return array( 'result' => 'failure' );
 		}
-		$order->update_meta_data( self::META_UUID, $order->get_id() . '-' . time() );
+		$this->mint_uuid( $order );
 		$order->save();
 		return array(
 			'result'   => 'success',
 			'redirect' => $order->get_checkout_payment_url( true ),
 		);
+	}
+
+	/**
+	 * Starts a new transaction for the order: sets the current UUID and remembers it with the
+	 * amount eSewa will be asked for. The caller saves the order.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return string The new UUID.
+	 */
+	private function mint_uuid( WC_Order $order ): string {
+		$uuid       = $order->get_id() . '-' . time();
+		$remembered = $this->remembered_uuids( $order );
+		unset( $remembered[ $uuid ] ); // Same second: move it to the end.
+		$remembered[ $uuid ] = $this->order_amount( $order );
+		$remembered          = array_slice( $remembered, -self::MAX_REMEMBERED_UUIDS, null, true );
+		$order->update_meta_data( self::META_UUID, $uuid );
+		$order->update_meta_data( self::META_UUIDS, $remembered );
+		return $uuid;
+	}
+
+	/**
+	 * Every transaction UUID minted for the order (uuid => amount sent to eSewa), oldest first.
+	 * Includes the current UUID of orders from before the list was kept.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return array<string,string>
+	 */
+	public function remembered_uuids( WC_Order $order ): array {
+		$stored     = $order->get_meta( self::META_UUIDS );
+		$remembered = array();
+		foreach ( is_array( $stored ) ? $stored : array() as $uuid => $amount ) {
+			if ( is_string( $uuid ) && '' !== $uuid && is_scalar( $amount ) ) {
+				$remembered[ $uuid ] = (string) $amount;
+			}
+		}
+		$current = (string) $order->get_meta( self::META_UUID );
+		if ( '' !== $current && ! isset( $remembered[ $current ] ) ) {
+			$remembered[ $current ] = $this->order_amount( $order );
+		}
+		return $remembered;
 	}
 
 	/**
@@ -261,8 +306,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 	public function form_fields_for( WC_Order $order ): array {
 		$uuid = (string) $order->get_meta( self::META_UUID );
 		if ( '' === $uuid ) {
-			$uuid = $order->get_id() . '-' . time();
-			$order->update_meta_data( self::META_UUID, $uuid );
+			$uuid = $this->mint_uuid( $order );
 			$order->save();
 		}
 		$amount = $this->order_amount( $order );
