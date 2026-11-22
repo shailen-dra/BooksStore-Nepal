@@ -5,7 +5,8 @@
  * A customer who pays on eSewa but never comes back to the site leaves the order pending.
  * Every 5 minutes (Action Scheduler) this asks eSewa's status API about recent unpaid eSewa
  * orders and completes those eSewa reports paid, through the gateway's locked completion path.
- * It also notes eSewa payments for orders since switched to another payment method.
+ * It also notes eSewa payments for orders since switched to another payment method, and second
+ * payments on orders already paid.
  *
  * @package BookstoreNepal
  */
@@ -29,9 +30,11 @@ class EsewaReconciler {
 	public const MIN_AGE = 600;
 	// After this, staff check the eSewa merchant portal by hand.
 	public const MAX_AGE = 172800;
-	// Orders checked per run; orders paid by another method take up to STRAY_BATCH_SIZE of them.
-	public const BATCH_SIZE       = 20;
-	public const STRAY_BATCH_SIZE = 5;
+	// Orders checked per run. Orders paid by another method, and paid eSewa orders with more
+	// than one transaction, take up to 5 each; unpaid eSewa orders the rest.
+	public const BATCH_SIZE        = 20;
+	public const STRAY_BATCH_SIZE  = 5;
+	public const DOUBLE_BATCH_SIZE = 5;
 	// Seconds after which a run stops starting new checks (the status API timeout is 8s each).
 	public const TIME_BUDGET = 20;
 	// Where each query's page offset is kept, so successive runs go round all candidates.
@@ -139,8 +142,9 @@ class EsewaReconciler {
 	}
 
 	/**
-	 * The scheduled check: unpaid eSewa orders, then orders switched to another method, created
-	 * between 10 minutes and 48 hours ago, at most BATCH_SIZE per run.
+	 * The scheduled check, for orders created between 10 minutes and 48 hours ago, at most
+	 * BATCH_SIZE per run: orders switched to another method (stray payments), paid eSewa orders
+	 * with more than one transaction (second payments), then unpaid eSewa orders.
 	 */
 	public static function run(): void {
 		self::reset_request_state();
@@ -165,6 +169,20 @@ class EsewaReconciler {
 			$offsets,
 			$deadline
 		);
+		$doubles = self::process(
+			$gateway,
+			'double',
+			array_merge(
+				self::has_meta_args( EsewaGateway::META_MULTIPLE ),
+				array(
+					'payment_method' => EsewaGateway::ID,
+					'status'         => wc_get_is_paid_statuses(),
+				)
+			),
+			self::DOUBLE_BATCH_SIZE,
+			$offsets,
+			$deadline
+		);
 		self::process(
 			$gateway,
 			'esewa',
@@ -172,7 +190,7 @@ class EsewaReconciler {
 				'payment_method' => EsewaGateway::ID,
 				'status'         => array( 'pending', 'failed' ),
 			),
-			self::BATCH_SIZE - $strays,
+			self::BATCH_SIZE - $strays - $doubles,
 			$offsets,
 			$deadline
 		);
@@ -211,7 +229,7 @@ class EsewaReconciler {
 			if ( $result['api_down'] ) {
 				self::$api_unavailable = true;
 			}
-			if ( 'stray' === $key || in_array( $result['outcome'], array( EsewaGateway::RECONCILE_RETRY, EsewaGateway::RECONCILE_UNPAID, EsewaGateway::RECONCILE_MISMATCH ), true ) ) {
+			if ( 'esewa' !== $key || in_array( $result['outcome'], array( EsewaGateway::RECONCILE_RETRY, EsewaGateway::RECONCILE_UNPAID, EsewaGateway::RECONCILE_MISMATCH ), true ) ) {
 				++$kept;
 			}
 		}

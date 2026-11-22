@@ -40,6 +40,8 @@ class EsewaGateway extends WC_Payment_Gateway {
 	public const META_STATUS_NOTES = '_bsn_esewa_status_notes';
 	// Set while an order with eSewa transactions is paid by another method, for the stray check.
 	public const META_STRAY_CHECK  = '_bsn_esewa_stray_check';
+	// Set once an order has more than one transaction, for the second-payment check.
+	public const META_MULTIPLE     = '_bsn_esewa_multiple';
 	public const TEST_PRODUCT_CODE = 'EPAYTEST';
 	// Public UAT secret published in eSewa's developer docs. Live secret lives in settings only.
 	public const TEST_SECRET     = '8gBm/:&EnhH.1/q';
@@ -278,6 +280,9 @@ class EsewaGateway extends WC_Payment_Gateway {
 		$remembered          = array_slice( $remembered, -self::MAX_REMEMBERED_UUIDS, null, true );
 		$order->update_meta_data( self::META_UUID, $uuid );
 		$order->update_meta_data( self::META_UUIDS, $remembered );
+		if ( count( $remembered ) > 1 ) {
+			$order->update_meta_data( self::META_MULTIPLE, '1' );
+		}
 		return $uuid;
 	}
 
@@ -799,12 +804,16 @@ class EsewaGateway extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * Background check of an order's eSewa transactions with the status API, for orders whose
-	 * customer did not come back from eSewa. Completes an unpaid eSewa order (pending or failed)
-	 * when eSewa reports one of its transactions COMPLETE for the order total; for an order now
-	 * paid by another method, notes the stray payment instead. Other statuses get one note per
-	 * transaction and status. Status requests are made without the lock; the decision is taken
-	 * under the order lock on a fresh copy, like the callback, so the two never both complete it.
+	 * Background check of an order's eSewa transactions with the status API.
+	 *
+	 * - Unpaid eSewa order (pending or failed), for customers who did not come back from eSewa:
+	 *   completed when eSewa reports one of its transactions COMPLETE for the order total; other
+	 *   statuses get one note per transaction and status.
+	 * - Paid eSewa order: its other transactions are checked for a second payment.
+	 * - Order now paid by another method: its transactions are checked for a stray payment.
+	 *
+	 * Status requests are made without the lock; every decision is taken under the order lock on
+	 * a fresh copy, like the callback, so the two never both complete the order.
 	 *
 	 * @param int $order_id Order ID.
 	 * @return array{outcome:string,api_down:bool} outcome: a RECONCILE_* value; api_down: eSewa's
@@ -812,29 +821,35 @@ class EsewaGateway extends WC_Payment_Gateway {
 	 */
 	public function reconcile( int $order_id ): array {
 		$result = array(
-			'outcome'   => self::RECONCILE_SKIPPED,
-			'api_down'  => false,
+			'outcome'  => self::RECONCILE_SKIPPED,
+			'api_down' => false,
 		);
 		$order  = $this->reload_order( $order_id );
 		if ( null === $order || '' === $this->product_code() ) {
 			return $result;
 		}
-		$is_esewa = self::ID === $order->get_payment_method();
-		if ( $is_esewa && $order->is_paid() ) {
-			$result['outcome'] = self::RECONCILE_ALREADY_PAID;
+		if ( self::ID !== $order->get_payment_method() ) {
+			$extra              = $this->check_unexpected_payments( $order, false );
+			$result['outcome']  = $extra['found'] ? self::RECONCILE_STRAY : self::RECONCILE_SKIPPED;
+			$result['api_down'] = $extra['api_down'];
 			return $result;
 		}
-		if ( $is_esewa && ! $order->has_status( array( 'pending', 'failed' ) ) ) {
+		if ( $order->is_paid() ) {
+			$result['outcome']  = self::RECONCILE_ALREADY_PAID;
+			$result['api_down'] = $this->check_unexpected_payments( $order, true )['api_down'];
+			return $result;
+		}
+		if ( ! $order->has_status( array( 'pending', 'failed' ) ) ) {
 			return $result;
 		}
 
 		$checks   = array(); // uuid => check_status() result.
 		$complete = '';      // UUID eSewa reports paid.
 		// Newest first: the latest attempt is the likeliest to be paid.
-		foreach ( array_reverse( $this->unchecked_uuids( $order, $is_esewa ), true ) as $uuid => $amount ) {
+		foreach ( array_reverse( $this->unchecked_uuids( $order ), true ) as $uuid => $amount ) {
 			$uuid  = (string) $uuid;
 			$check = $this->check_status( $uuid, $amount );
-			if ( self::CHECK_COMPLETE === $check['outcome'] && $is_esewa && ! $this->amounts_match( $check['amount'], $order ) ) {
+			if ( self::CHECK_COMPLETE === $check['outcome'] && ! $this->amounts_match( $check['amount'], $order ) ) {
 				$check['outcome'] = self::CHECK_MISMATCH;
 				$check['message'] = $this->amount_mismatch_message();
 			}
@@ -843,21 +858,19 @@ class EsewaGateway extends WC_Payment_Gateway {
 				$complete = $uuid;
 				break;
 			}
-			if ( $check['failed'] ) {
-				error_log( sprintf( 'Bookstore Nepal eSewa: automatic check of order %d (transaction %s) failed: %s', $order_id, $uuid, $check['message'] ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			}
+			$this->log_failed_check( $order_id, $uuid, $check );
 			if ( $check['api_down'] ) {
 				$result['api_down'] = true;
 				break; // Unreachable: don't wait on it for the other transactions.
 			}
 		}
 		if ( ! $checks ) {
-			$result['outcome'] = $is_esewa ? self::RECONCILE_UNPAID : self::RECONCILE_SKIPPED;
+			$result['outcome'] = self::RECONCILE_UNPAID;
 			return $result;
 		}
 		$to_record = array_filter( $checks, static fn( $check ) => self::CHECK_RETRY !== $check['outcome'] );
 		if ( '' === $complete && ! $to_record ) {
-			// Only undecided answers or an API failure: nothing to write.
+			// Only undecided answers or failed requests: nothing to write.
 			$result['outcome'] = self::RECONCILE_RETRY;
 			return $result;
 		}
@@ -873,11 +886,18 @@ class EsewaGateway extends WC_Payment_Gateway {
 		} finally {
 			$this->unlock( $lock );
 		}
+		if ( self::RECONCILE_PAID === $result['outcome'] && ! $result['api_down'] ) {
+			// The same check a paid order gets on later runs, now: another attempt may be paid too.
+			$paid = $this->reload_order( $order_id );
+			if ( null !== $paid ) {
+				$result['api_down'] = $this->check_unexpected_payments( $paid, true )['api_down'];
+			}
+		}
 		return $result;
 	}
 
 	/**
-	 * Acts on status checks for an order. The caller holds the order lock.
+	 * Acts on status checks for an unpaid eSewa order. The caller holds the order lock.
 	 *
 	 * @param int    $order_id Order ID.
 	 * @param array  $checks   uuid => check_status() result.
@@ -890,24 +910,21 @@ class EsewaGateway extends WC_Payment_Gateway {
 		if ( null === $order ) {
 			return self::RECONCILE_SKIPPED;
 		}
-		$is_esewa = self::ID === $order->get_payment_method();
+		if ( self::ID !== $order->get_payment_method() ) {
+			return self::RECONCILE_RETRY; // Switched meanwhile: the stray check takes it from here.
+		}
+		if ( $order->is_paid() ) {
+			return self::RECONCILE_ALREADY_PAID;
+		}
 		if ( '' !== $complete ) {
 			$check = $checks[ $complete ];
-			if ( ! $is_esewa ) {
-				if ( ! $order->get_meta( $this->verified_stray_key( $complete ) ) ) {
-					$order->update_meta_data( $this->verified_stray_key( $complete ), gmdate( 'c' ) );
-					$this->add_stray_note( $order, $complete, $check['ref_id'], __( 'confirmed by eSewa status check', 'bookstore-nepal' ) );
-					$order->save();
-				}
-				return self::RECONCILE_STRAY;
-			}
-			if ( $order->is_paid() ) {
-				return self::RECONCILE_ALREADY_PAID;
-			}
 			if ( ! $order->has_status( array( 'pending', 'failed' ) ) || ! $this->amounts_match( $check['amount'], $order ) ) {
 				// Changed while we asked eSewa (status set by staff, total edited): look again next run.
 				return self::RECONCILE_RETRY;
 			}
+			// Remember the other answers quietly, so the second-payment check does not ask again.
+			unset( $checks[ $complete ] );
+			$this->record_statuses( $order, $checks, false );
 			$this->complete_payment(
 				$order,
 				$complete,
@@ -921,21 +938,33 @@ class EsewaGateway extends WC_Payment_Gateway {
 			);
 			return self::RECONCILE_PAID;
 		}
-		if ( $is_esewa && $order->is_paid() ) {
-			return self::RECONCILE_ALREADY_PAID;
-		}
 
-		$outcome = self::RECONCILE_UNPAID;
+		if ( $this->record_statuses( $order, $checks, true ) ) {
+			$order->save();
+		}
+		$outcomes = wp_list_pluck( $checks, 'outcome' );
+		if ( in_array( self::CHECK_RETRY, $outcomes, true ) ) {
+			return self::RECONCILE_RETRY;
+		}
+		return in_array( self::CHECK_MISMATCH, $outcomes, true ) ? self::RECONCILE_MISMATCH : self::RECONCILE_UNPAID;
+	}
+
+	/**
+	 * Remembers each settled (non-retry) answer, once per transaction and status, with an order
+	 * note when asked. The caller saves the order.
+	 *
+	 * @param WC_Order $order      Order.
+	 * @param array    $checks     uuid => check_status() result.
+	 * @param bool     $with_notes Add an order note for each newly seen answer.
+	 * @return bool Whether anything was added.
+	 */
+	private function record_statuses( WC_Order $order, array $checks, bool $with_notes ): bool {
 		$noted   = $order->get_meta( self::META_STATUS_NOTES );
 		$noted   = is_array( $noted ) ? $noted : array();
 		$changed = false;
 		foreach ( $checks as $uuid => $check ) {
-			if ( self::CHECK_RETRY === $check['outcome'] ) {
-				$outcome = self::RECONCILE_RETRY;
+			if ( self::CHECK_RETRY === $check['outcome'] || self::CHECK_COMPLETE === $check['outcome'] ) {
 				continue;
-			}
-			if ( self::CHECK_MISMATCH === $check['outcome'] && self::RECONCILE_RETRY !== $outcome ) {
-				$outcome = self::RECONCILE_MISMATCH;
 			}
 			$key = self::CHECK_MISMATCH === $check['outcome'] ? 'MISMATCH' : $check['status'];
 			if ( isset( $noted[ $uuid ][ $key ] ) ) {
@@ -943,42 +972,158 @@ class EsewaGateway extends WC_Payment_Gateway {
 			}
 			$noted[ $uuid ][ $key ] = gmdate( 'c' );
 			$changed                = true;
-			if ( ! $is_esewa ) {
-				continue; // Only a paid transaction matters on an order paid by another method; remember the status quietly.
+			if ( $with_notes ) {
+				$order->add_order_note(
+					sprintf(
+						/* translators: 1: eSewa transaction UUID, 2: result of the status check. */
+						__( 'Automatic eSewa payment check for transaction %1$s: %2$s', 'bookstore-nepal' ),
+						$uuid,
+						$check['message']
+					)
+				);
 			}
-			$order->add_order_note(
-				sprintf(
-					/* translators: 1: eSewa transaction UUID, 2: result of the status check. */
-					__( 'Automatic eSewa payment check for transaction %1$s: %2$s', 'bookstore-nepal' ),
-					$uuid,
-					$check['message']
-				)
-			);
 		}
 		if ( $changed ) {
 			$order->update_meta_data( self::META_STATUS_NOTES, $noted );
-			$order->save();
 		}
-		return $outcome;
+		return $changed;
 	}
 
 	/**
-	 * Remembered transactions still worth asking eSewa about: not in a final status, and for an
-	 * order paid by another method, not already noted as a stray payment.
+	 * Looks for money eSewa took that the order does not account for: on a paid eSewa order, any
+	 * of its other transactions that is COMPLETE (a second payment); on an order now paid by
+	 * another method, any COMPLETE transaction (a stray payment). Each gets one refund note.
+	 * Transactions already noted, or with a settled answer, are not asked again; when none are
+	 * left, the order's flag is removed so the scheduled query stops returning it.
 	 *
-	 * @param WC_Order $order    Order.
-	 * @param bool     $is_esewa Whether the order is paid with eSewa.
+	 * @param WC_Order $order Order (fresh).
+	 * @param bool     $paid  True for a paid eSewa order, false for an order paid by another method.
+	 * @return array{found:bool,api_down:bool} found: a COMPLETE transaction was seen.
+	 */
+	private function check_unexpected_payments( WC_Order $order, bool $paid ): array {
+		$result   = array(
+			'found'    => false,
+			'api_down' => false,
+		);
+		$order_id = $order->get_id();
+		$todo     = $this->unexplained_uuids( $order, $paid );
+		$flag     = $paid ? self::META_MULTIPLE : self::META_STRAY_CHECK;
+		if ( ! $todo && ! $order->get_meta( $flag ) ) {
+			return $result;
+		}
+		$checks = array();
+		foreach ( array_reverse( $todo, true ) as $uuid => $amount ) {
+			$uuid  = (string) $uuid;
+			$check = $this->check_status( $uuid, $amount );
+			$this->log_failed_check( $order_id, $uuid, $check );
+			if ( self::CHECK_RETRY !== $check['outcome'] ) {
+				$checks[ $uuid ] = $check;
+			}
+			if ( $check['api_down'] ) {
+				$result['api_down'] = true;
+				break;
+			}
+		}
+		$result['found'] = in_array( self::CHECK_COMPLETE, wp_list_pluck( $checks, 'outcome' ), true );
+		if ( $todo && ! $checks ) {
+			return $result; // Only undecided answers: ask again next run.
+		}
+		$lock = $this->lock( $order_id, 0 );
+		if ( null === $lock ) {
+			return $result;
+		}
+		try {
+			$order = $this->reload_order( $order_id );
+			if ( null === $order || ( self::ID === $order->get_payment_method() ) !== $paid || ( $paid && ! $order->is_paid() ) ) {
+				return $result; // Changed meanwhile; the next run looks again.
+			}
+			$changed = $this->record_statuses( $order, $checks, false );
+			foreach ( $checks as $uuid => $check ) {
+				if ( self::CHECK_COMPLETE !== $check['outcome'] || $order->get_meta( $this->verified_stray_key( $uuid ) ) ) {
+					continue;
+				}
+				$order->update_meta_data( $this->verified_stray_key( $uuid ), gmdate( 'c' ) );
+				$changed = true;
+				if ( $paid ) {
+					$order->add_order_note(
+						sprintf(
+							/* translators: 1: eSewa reference id, 2: eSewa transaction UUID. */
+							__( 'eSewa took a second payment for this order — refund ref %1$s in the eSewa merchant portal. Transaction UUID: %2$s.', 'bookstore-nepal' ),
+							'' === $check['ref_id'] ? __( 'unknown', 'bookstore-nepal' ) : $check['ref_id'],
+							$uuid
+						)
+					);
+				} else {
+					$this->add_stray_note( $order, $uuid, $check['ref_id'], __( 'confirmed by eSewa status check', 'bookstore-nepal' ) );
+				}
+			}
+			if ( ! $this->unexplained_uuids( $order, $paid ) && $order->get_meta( $flag ) ) {
+				$order->delete_meta_data( $flag );
+				$changed = true;
+			}
+			if ( $changed ) {
+				$order->save();
+			}
+		} finally {
+			$this->unlock( $lock );
+		}
+		return $result;
+	}
+
+	/**
+	 * Transactions of an order that eSewa may hold unexpected money for and that are still
+	 * unanswered: all remembered UUIDs except the one that paid the order, those already noted
+	 * as a stray or second payment, and those with a settled status.
+	 *
+	 * @param WC_Order $order Order.
+	 * @param bool     $paid  True for a paid eSewa order.
 	 * @return array<string,string> uuid => amount, oldest first.
 	 */
-	private function unchecked_uuids( WC_Order $order, bool $is_esewa ): array {
+	private function unexplained_uuids( WC_Order $order, bool $paid ): array {
+		$paid_uuid = '';
+		if ( $paid ) {
+			// Orders paid before the paying UUID was recorded were paid by their current UUID.
+			$paid_uuid = (string) $order->get_meta( self::META_PAID_UUID );
+			$paid_uuid = '' !== $paid_uuid ? $paid_uuid : (string) $order->get_meta( self::META_UUID );
+		}
+		$noted = $order->get_meta( self::META_STATUS_NOTES );
+		$noted = is_array( $noted ) ? $noted : array();
+		$out   = array();
+		foreach ( $this->remembered_uuids( $order ) as $uuid => $amount ) {
+			$uuid = (string) $uuid;
+			if ( $uuid === $paid_uuid || ! empty( $noted[ $uuid ] ) || $order->get_meta( $this->verified_stray_key( $uuid ) ) ) {
+				continue;
+			}
+			$out[ $uuid ] = $amount;
+		}
+		return $out;
+	}
+
+	/**
+	 * Logs a status request that got no usable answer, for the debug log.
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param string $uuid     Transaction UUID.
+	 * @param array  $check    check_status() result.
+	 */
+	private function log_failed_check( int $order_id, string $uuid, array $check ): void {
+		if ( $check['failed'] ) {
+			error_log( sprintf( 'Bookstore Nepal eSewa: automatic check of order %d (transaction %s) failed: %s', $order_id, $uuid, $check['message'] ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+	}
+
+	/**
+	 * Transactions of an unpaid eSewa order still worth asking eSewa about: not in a final status.
+	 *
+	 * @param WC_Order $order Order.
+	 * @return array<string,string> uuid => amount, oldest first.
+	 */
+	private function unchecked_uuids( WC_Order $order ): array {
 		$noted = $order->get_meta( self::META_STATUS_NOTES );
 		$noted = is_array( $noted ) ? $noted : array();
 		$out   = array();
 		foreach ( $this->remembered_uuids( $order ) as $uuid => $amount ) {
 			if ( array_intersect( self::FINAL_STATUSES, array_keys( (array) ( $noted[ $uuid ] ?? array() ) ) ) ) {
-				continue;
-			}
-			if ( ! $is_esewa && $order->get_meta( $this->verified_stray_key( (string) $uuid ) ) ) {
 				continue;
 			}
 			$out[ $uuid ] = $amount;

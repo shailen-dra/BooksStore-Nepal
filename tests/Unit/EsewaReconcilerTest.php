@@ -150,9 +150,36 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 	 * Adds an earlier transaction UUID, as if the customer had tried once before.
 	 */
 	private function add_earlier_attempt( WC_Order $order, string $uuid ): WC_Order {
-		$order->update_meta_data( EsewaGateway::META_UUIDS, array( $uuid => '500' ) + $this->gateway->remembered_uuids( $order ) );
+		$order->update_meta_data( EsewaGateway::META_UUID, $uuid );
+		$order->update_meta_data( EsewaGateway::META_UUIDS, array( $uuid => '500' ) );
 		$order->save();
-		return $this->fresh( $order );
+		$this->gateway->process_payment( $order->get_id() ); // The retry mints a new current UUID.
+		$order = $this->fresh( $order );
+		$this->assertNotSame( $uuid, $this->uuid( $order ) );
+		return $order;
+	}
+
+	/**
+	 * eSewa's signed success redirect for one of the order's transactions.
+	 */
+	private function callback_success( WC_Order $order, string $uuid ): string {
+		$payload              = array(
+			'transaction_code'   => '0LD5CEH',
+			'status'             => 'COMPLETE',
+			'total_amount'       => '500.0',
+			'transaction_uuid'   => $uuid,
+			'product_code'       => 'EPAYTEST',
+			'signed_field_names' => 'transaction_code,status,total_amount,transaction_uuid,product_code,signed_field_names',
+		);
+		$payload['signature'] = EsewaSignature::sign( $payload, explode( ',', $payload['signed_field_names'] ), self::TEST_SECRET );
+		return $this->gateway->handle_callback(
+			array(
+				'result'   => 'success',
+				'order_id' => (string) $order->get_id(),
+				'key'      => $order->get_order_key(),
+				'data'     => base64_encode( wp_json_encode( $payload ) ),
+			)
+		);
 	}
 
 	private function fresh( WC_Order $order ): WC_Order {
@@ -448,6 +475,90 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		$this->statuses[ $uuid ] = 'COMPLETE';
 		EsewaReconciler::run();
 		$this->assertSame( 1, $this->count_notes_containing( $this->fresh( $order ), 'after it was switched to another payment method' ) );
+		$this->assertSame( array(), $this->requested );
+	}
+
+	public function test_second_payment_on_order_paid_by_callback_gets_one_refund_note(): void {
+		// Paid on attempt A, the tab died; retried and paid on B, and B's callback completed the order.
+		$order   = $this->order();
+		$first   = $order->get_id() . '-1700000000';
+		$order   = $this->add_earlier_attempt( $order, $first );
+		$second  = $this->uuid( $order );
+		$this->statuses[ $first ]  = 'COMPLETE';
+		$this->statuses[ $second ] = 'COMPLETE';
+		$this->callback_success( $order, $second );
+		$this->assertSame( 'processing', $this->fresh( $order )->get_status() );
+		$completions     = did_action( 'woocommerce_payment_complete' );
+		$this->requested = array();
+
+		EsewaReconciler::run();
+		EsewaReconciler::run();
+
+		$order = $this->fresh( $order );
+		$this->assertSame( array( $first ), $this->requested, 'Only the other transaction is asked, once.' );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'eSewa took a second payment for this order — refund ref 0007G36 in the eSewa merchant portal' ) );
+		$this->assertSame( 1, $this->count_notes_containing( $order, $first ) );
+		$this->assertSame( 'processing', $order->get_status() );
+		$this->assertSame( '0LD5CEH', $order->get_transaction_id() );
+		$this->assertSame( $completions, did_action( 'woocommerce_payment_complete' ) );
+		$this->assertSame( 9, $this->stock() );
+	}
+
+	public function test_reconcile_that_completes_an_order_checks_its_other_transactions(): void {
+		$order  = $this->order();
+		$first  = $order->get_id() . '-1700000000';
+		$order  = $this->add_earlier_attempt( $order, $first );
+		$second = $this->uuid( $order );
+		$this->statuses[ $first ]  = 'COMPLETE';
+		$this->statuses[ $second ] = 'COMPLETE';
+
+		EsewaReconciler::run();
+
+		$order = $this->fresh( $order );
+		$this->assertSame( array( $second, $first ), $this->requested );
+		$this->assertSame( 'processing', $order->get_status() );
+		$this->assertSame( $second, $order->get_meta( EsewaGateway::META_PAID_UUID ) );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'eSewa took a second payment for this order' ) );
+		$this->assertSame( 9, $this->stock() );
+
+		EsewaReconciler::run();
+		$this->assertCount( 2, $this->requested, 'Nothing left to ask.' );
+		$this->assertSame( 1, $this->count_notes_containing( $this->fresh( $order ), 'eSewa took a second payment for this order' ) );
+	}
+
+	public function test_unpaid_other_transactions_of_a_paid_order_are_asked_until_answered(): void {
+		$order  = $this->order();
+		$first  = $order->get_id() . '-1700000000';
+		$order  = $this->add_earlier_attempt( $order, $first );
+		$this->statuses[ $this->uuid( $order ) ] = 'COMPLETE';
+		$this->callback_success( $order, $this->uuid( $order ) );
+		$notes           = $this->note_texts( $this->fresh( $order ) );
+		$this->requested = array();
+
+		$this->statuses[ $first ] = 'PENDING';
+		EsewaReconciler::run();
+		$this->statuses[ $first ] = 'NOT_FOUND';
+		EsewaReconciler::run();
+		EsewaReconciler::run();
+
+		$this->assertSame( array( $first, $first ), $this->requested, 'PENDING asked again; NOT_FOUND settles it.' );
+		$this->assertSame( $notes, $this->note_texts( $this->fresh( $order ) ), 'No notes for an unpaid extra attempt.' );
+	}
+
+	public function test_paid_orders_with_one_transaction_or_older_than_two_days_are_not_asked(): void {
+		$single = $this->order();
+		$this->statuses[ $this->uuid( $single ) ] = 'COMPLETE';
+		$this->callback_success( $single, $this->uuid( $single ) );
+
+		$old   = $this->order( 49 * 60 );
+		$first = $old->get_id() . '-1700000000';
+		$old   = $this->add_earlier_attempt( $old, $first );
+		$this->statuses[ $this->uuid( $old ) ] = 'COMPLETE';
+		$this->statuses[ $first ]              = 'COMPLETE';
+		$this->callback_success( $old, $this->uuid( $old ) );
+		$this->requested = array();
+
+		EsewaReconciler::run();
 		$this->assertSame( array(), $this->requested );
 	}
 
