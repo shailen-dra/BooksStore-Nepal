@@ -1,2 +1,8 @@
 .remember/
 .DS_Store
+vendor/
+.phpunit.result.cache
+.playwright-mcp/
+.idea/
+.wp-tests-lib/
+.wp-tests-wordpress/

@@ -1,0 +1,442 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/theme.json",
+	"version": 3,
+	"settings": {
+		"appearanceTools": true,
+		"useRootPaddingAwareAlignments": true,
+		"color": {
+			"defaultPalette": false,
+			"defaultGradients": false,
+			"defaultDuotone": false,
+			"palette": [
+				{
+					"slug": "base",
+					"name": "Cream",
+					"color": "#FFF8EC"
+				},
+				{
+					"slug": "contrast",
+					"name": "Ink",
+					"color": "#1F2A44"
+				},
+				{
+					"slug": "accent-1",
+					"name": "Marigold",
+					"color": "#F4B23E"
+				},
+				{
+					"slug": "accent-2",
+					"name": "Himal blue",
+					"color": "#1E5A9C"
+				},
+				{
+					"slug": "accent-3",
+					"name": "Tika orange",
+					"color": "#C8440E"
+				}
+			]
+		},
+		"layout": {
+			"contentSize": "760px",
+			"wideSize": "1152px"
+		},
+		"spacing": {
+			"defaultSpacingSizes": false,
+			"spacingSizes": [
+				{
+					"slug": "20",
+					"name": "Tiny",
+					"size": "8px"
+				},
+				{
+					"slug": "30",
+					"name": "X-Small",
+					"size": "16px"
+				},
+				{
+					"slug": "40",
+					"name": "Small",
+					"size": "24px"
+				},
+				{
+					"slug": "50",
+					"name": "Regular",
+					"size": "clamp(28px, 4vw, 40px)"
+				},
+				{
+					"slug": "60",
+					"name": "Large",
+					"size": "clamp(32px, 5vw, 64px)"
+				},
+				{
+					"slug": "70",
+					"name": "X-Large",
+					"size": "clamp(48px, 7vw, 90px)"
+				},
+				{
+					"slug": "80",
+					"name": "XX-Large",
+					"size": "clamp(64px, 9vw, 120px)"
+				}
+			],
+			"units": [
+				"px",
+				"em",
+				"rem",
+				"%",
+				"vh",
+				"vw"
+			]
+		},
+		"typography": {
+			"defaultFontSizes": false,
+			"fluid": false,
+			"fontFamilies": [
+				{
+					"slug": "display",
+					"name": "Baloo 2",
+					"fontFamily": "\"Baloo 2\", \"Mukta\", system-ui, sans-serif",
+					"fontFace": [
+						{
+							"fontFamily": "Baloo 2",
+							"fontStyle": "normal",
+							"fontWeight": "600 800",
+							"fontDisplay": "swap",
+							"src": [
+								"file:./assets/fonts/baloo2-latin.woff2"
+							],
+							"unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+						},
+						{
+							"fontFamily": "Baloo 2",
+							"fontStyle": "normal",
+							"fontWeight": "600 800",
+							"fontDisplay": "swap",
+							"src": [
+								"file:./assets/fonts/baloo2-devanagari.woff2"
+							],
+							"unicodeRange": "U+0900-097F, U+1CD0-1CF4, U+1CF7-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B0A"
+						}
+					]
+				},
+				{
+					"slug": "body",
+					"name": "Mukta",
+					"fontFamily": "\"Mukta\", system-ui, -apple-system, \"Segoe UI\", sans-serif",
+					"fontFace": [
+						{
+							"fontFamily": "Mukta",
+							"fontStyle": "normal",
+							"fontWeight": "400",
+							"fontDisplay": "swap",
+							"src": [
+								"file:./assets/fonts/mukta-400-latin.woff2"
+							],
+							"unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+						},
+						{
+							"fontFamily": "Mukta",
+							"fontStyle": "normal",
+							"fontWeight": "400",
+							"fontDisplay": "swap",
+							"src": [
+								"file:./assets/fonts/mukta-400-devanagari.woff2"
+							],
+							"unicodeRange": "U+0900-097F, U+1CD0-1CF4, U+1CF7-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B0A"
+						},
+						{
+							"fontFamily": "Mukta",
+							"fontStyle": "normal",
+							"fontWeight": "500",
+							"fontDisplay": "swap",
+							"src": [
+								"file:./assets/fonts/mukta-500-latin.woff2"
+							],
+							"unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+						},
+						{
+							"fontFamily": "Mukta",
+							"fontStyle": "normal",
+							"fontWeight": "500",
+							"fontDisplay": "swap",
+							"src": [
+								"file:./assets/fonts/mukta-500-devanagari.woff2"
+							],
+							"unicodeRange": "U+0900-097F, U+1CD0-1CF4, U+1CF7-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B0A"
+						},
+						{
+							"fontFamily": "Mukta",
+							"fontStyle": "normal",
+							"fontWeight": "700",
+							"fontDisplay": "swap",
+							"src": [
+								"file:./assets/fonts/mukta-700-latin.woff2"
+							],
+							"unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+						},
+						{
+							"fontFamily": "Mukta",
+							"fontStyle": "normal",
+							"fontWeight": "700",
+							"fontDisplay": "swap",
+							"src": [
+								"file:./assets/fonts/mukta-700-devanagari.woff2"
+							],
+							"unicodeRange": "U+0900-097F, U+1CD0-1CF4, U+1CF7-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF, U+11B00-11B0A"
+						}
+					]
+				}
+			],
+			"fontSizes": [
+				{
+					"slug": "small",
+					"name": "Small",
+					"size": "15px"
+				},
+				{
+					"slug": "medium",
+					"name": "Medium",
+					"size": "18px"
+				},
+				{
+					"slug": "large",
+					"name": "Large",
+					"size": "21px"
+				},
+				{
+					"slug": "x-large",
+					"name": "Extra Large",
+					"size": "clamp(28px, 3.2vw, 38px)"
+				},
+				{
+					"slug": "xx-large",
+					"name": "Extra Extra Large",
+					"size": "clamp(38px, 5vw, 64px)"
+				}
+			]
+		},
+		"custom": {
+			"color": {
+				"white": "#FFFFFF",
+				"muted": "#46506A",
+				"subtle": "#5A6378",
+				"line": "#F1E4CC",
+				"border": "#E3D3B5",
+				"gold-light": "#F4C66B",
+				"on-dark": "#E8ECF5",
+				"on-dark-muted": "#C3CADB",
+				"dark-line": "#3A4766",
+				"rose": "#FCE1E4",
+				"rose-line": "#F3BCC3",
+				"rose-ink": "#5A4148",
+				"mint": "#DDF3E6",
+				"mint-line": "#B4E2C6",
+				"mint-ink": "#2F4A3B",
+				"green": "#1B5E3A",
+				"sky": "#DCEBFA",
+				"sky-line": "#B5D2F0",
+				"sky-ink": "#2E4560",
+				"sky-strong": "#1E4A7A",
+				"rose-strong": "#7A2B36",
+				"link-hover": "#163F6E",
+				"button-hover": "#E9A42C"
+			},
+			"radius": {
+				"small": "14px",
+				"medium": "18px",
+				"large": "24px",
+				"pill": "999px"
+			}
+		}
+	},
+	"styles": {
+		"color": {
+			"background": "var:preset|color|base",
+			"text": "var:preset|color|contrast"
+		},
+		"spacing": {
+			"blockGap": "1.2rem",
+			"padding": {
+				"left": "clamp(16px, 3vw, 24px)",
+				"right": "clamp(16px, 3vw, 24px)"
+			}
+		},
+		"typography": {
+			"fontFamily": "var:preset|font-family|body",
+			"fontSize": "var:preset|font-size|medium",
+			"lineHeight": "1.55",
+			"fontWeight": "400"
+		},
+		"elements": {
+			"heading": {
+				"typography": {
+					"fontFamily": "var:preset|font-family|display",
+					"fontWeight": "800",
+					"lineHeight": "1.1",
+					"letterSpacing": "0"
+				},
+				"color": {
+					"text": "var:preset|color|contrast"
+				}
+			},
+			"h1": {
+				"typography": {
+					"fontSize": "var:preset|font-size|xx-large",
+					"lineHeight": "1.05"
+				}
+			},
+			"h2": {
+				"typography": {
+					"fontSize": "var:preset|font-size|x-large"
+				}
+			},
+			"h3": {
+				"typography": {
+					"fontSize": "var:preset|font-size|large"
+				}
+			},
+			"h4": {
+				"typography": {
+					"fontSize": "var:preset|font-size|medium"
+				}
+			},
+			"link": {
+				"color": {
+					"text": "var:preset|color|accent-2"
+				},
+				":hover": {
+					"color": {
+						"text": "var:custom|color|link-hover"
+					}
+				}
+			},
+			"button": {
+				"color": {
+					"background": "var:preset|color|accent-1",
+					"text": "var:preset|color|contrast"
+				},
+				"border": {
+					"radius": "999px",
+					"width": "0"
+				},
+				"spacing": {
+					"padding": {
+						"top": "0.6rem",
+						"bottom": "0.6rem",
+						"left": "1.6rem",
+						"right": "1.6rem"
+					}
+				},
+				"typography": {
+					"fontFamily": "var:preset|font-family|body",
+					"fontWeight": "700",
+					"fontSize": "var:preset|font-size|medium",
+					"lineHeight": "1.5"
+				},
+				":hover": {
+					"color": {
+						"background": "var:custom|color|button-hover",
+						"text": "var:preset|color|contrast"
+					}
+				},
+				":focus-visible": {
+					"outline": {
+						"color": "var:preset|color|accent-2",
+						"offset": "2px",
+						"style": "solid",
+						"width": "3px"
+					}
+				}
+			},
+			"caption": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small"
+				}
+			}
+		},
+		"blocks": {
+			"core/site-title": {
+				"typography": {
+					"fontFamily": "var:preset|font-family|display",
+					"fontWeight": "800",
+					"fontSize": "26px",
+					"lineHeight": "1.05"
+				},
+				"elements": {
+					"link": {
+						"color": {
+							"text": "var:preset|color|contrast"
+						},
+						"typography": {
+							"textDecoration": "none"
+						}
+					}
+				}
+			},
+			"core/site-tagline": {
+				"typography": {
+					"fontSize": "14px"
+				},
+				"color": {
+					"text": "var:custom|color|subtle"
+				}
+			},
+			"core/post-title": {
+				"typography": {
+					"fontWeight": "800"
+				},
+				"elements": {
+					"link": {
+						"color": {
+							"text": "var:preset|color|contrast"
+						},
+						"typography": {
+							"textDecoration": "none"
+						}
+					}
+				}
+			},
+			"core/navigation": {
+				"typography": {
+					"fontSize": "17px",
+					"fontWeight": "500"
+				},
+				"elements": {
+					"link": {
+						"color": {
+							"text": "var:preset|color|contrast"
+						}
+					}
+				}
+			},
+			"core/search": {
+				"typography": {
+					"fontSize": "16px"
+				}
+			},
+			"core/post-terms": {
+				"typography": {
+					"fontSize": "var:preset|font-size|small"
+				}
+			},
+			"core/separator": {
+				"color": {
+					"text": "var:custom|color|line"
+				}
+			}
+		}
+	},
+	"templateParts": [
+		{
+			"name": "header",
+			"title": "Header",
+			"area": "header"
+		},
+		{
+			"name": "footer",
+			"title": "Footer",
+			"area": "footer"
+		}
+	],
+	"customTemplates": []
+}

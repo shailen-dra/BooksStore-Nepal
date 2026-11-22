@@ -1,6 +1,6 @@
 # BooksStore-Nepal
 
-Online children's bookstore for Nepal, built on WordPress + WooCommerce. Customers browse books by age group, language and type, and pay with **eSewa**, **Khalti** or **cash on delivery**, with delivery anywhere in Nepal. The shop owner manages books, prices, stock and orders from wp-admin.
+Online children's bookstore for Nepal, built on WordPress + WooCommerce. Customers browse books by age group, language and type, and pay with **eSewa** or **cash on delivery** (**Khalti** is planned; see "Payments" below), with delivery anywhere in Nepal. The shop owner manages books, prices, stock and orders from wp-admin.
 
 ## Documents
 
@@ -8,6 +8,8 @@ Online children's bookstore for Nepal, built on WordPress + WooCommerce. Custome
 | --- | --- |
 | [docs/client-proposal.md](docs/client-proposal.md) | Client-facing proposal: features, payments, delivery, platform choice, costs |
 | [docs/superpowers/plans/2026-11-19-woocommerce-bookstore.md](docs/superpowers/plans/2026-11-19-woocommerce-bookstore.md) | Developer build plan, task by task |
+| [docs/admin-guide.md](docs/admin-guide.md) | Shop owner's guide to wp-admin: books, stock, orders, payments, delivery |
+| [docs/deployment.md](docs/deployment.md) | Going live: hosting, install, `wp bsn setup`, payment keys, launch checks, maintenance |
 
 ## What's in this repo
 
@@ -24,22 +26,38 @@ This repo holds only our custom code. WordPress core, WooCommerce and third-part
 ## Tech stack
 
 - WordPress 6.x + WooCommerce
-- PHP 8.1+ (local: Laravel Herd, PHP 8.3), MySQL 8
+- PHP 8.1+ (local: Laravel Herd, PHP 8.3), MariaDB 10.6+ or MySQL 8
 - WP-CLI, Composer, PHPUnit 9
 - Payments: eSewa ePay v2 (custom gateway in our plugin), Khalti (official WooCommerce plugin), WooCommerce cash on delivery
 
 ## Local development
 
-Requirements: [Laravel Herd](https://herd.laravel.com), MySQL (`brew install mysql`), WP-CLI (`brew install wp-cli`), Composer.
+Requirements: [Laravel Herd](https://herd.laravel.com), MariaDB 10.6+ or MySQL 8 listening on 127.0.0.1:3306, WP-CLI (`brew install wp-cli`), Composer.
+
+One-time database setup (as a DB admin), creating a `bookstore` user used by the site and the tests:
+
+```sql
+CREATE DATABASE bookstore_nepal;
+CREATE DATABASE wp_tests;
+CREATE USER 'bookstore'@'127.0.0.1' IDENTIFIED BY 'bookstore';
+GRANT ALL ON bookstore_nepal.* TO 'bookstore'@'127.0.0.1';
+GRANT ALL ON wp_tests.* TO 'bookstore'@'127.0.0.1';
+```
+
+`wp_tests` is wiped on every test run, so never point the tests at a database you care about.
 
 ```bash
 # 1. WordPress site served by Herd at http://bookstore-nepal.test
-mysql -u root -e "CREATE DATABASE bookstore_nepal"
 mkdir -p ~/Herd/bookstore-nepal && cd ~/Herd/bookstore-nepal
 wp core download
-wp config create --dbname=bookstore_nepal --dbuser=root --dbpass=''
+wp config create --dbname=bookstore_nepal --dbuser=bookstore --dbpass=bookstore --dbhost=127.0.0.1 \
+  --extra-php <<'PHP'
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', true );
+define( 'WP_DEBUG_DISPLAY', false );
+PHP
 wp core install --url=bookstore-nepal.test --title="Bookstore Nepal" \
-  --admin_user=admin --admin_email=admin@example.com --prompt=admin_password
+  --admin_user=admin --admin_email=admin@example.com --admin_password=admin --skip-email
 wp plugin install woocommerce --activate
 
 # 2. Link this repo's plugin and theme into the site, then configure the store
@@ -47,21 +65,26 @@ cd /path/to/this/repo
 bash bin/link-local.sh
 wp --path=~/Herd/bookstore-nepal plugin activate bookstore-nepal-core
 wp --path=~/Herd/bookstore-nepal bsn setup
+wp --path=~/Herd/bookstore-nepal theme activate bookstore-nepal
+bash bin/seed-sample-books.sh   # optional: 12 sample books
 
 # 3. Tests
 composer install
-bash bin/install-wp-tests.sh wp_tests root '' 127.0.0.1 latest
+# Known issue: the script first checks raw.githubusercontent.com for a newer version and hangs retrying
+# where that host is unreachable. Prefix it with WP_INSTALL_TESTS_SKIP_UPDATE_CHECK=true to skip the check.
+bash bin/install-wp-tests.sh wp_tests bookstore bookstore 127.0.0.1 latest true
 vendor/bin/phpunit
+# Optional env: WP_TESTS_DIR (default: <repo>/.wp-tests-lib, git-ignored; WordPress core for the tests goes in <repo>/.wp-tests-wordpress), WC_PLUGIN_DIR (default: the Herd site's WooCommerce)
 ```
 
-> The `bin/` scripts, plugin and theme are created by the build plan. Until those tasks are done, only step 1 works.
+> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. `wp bsn setup` leaves existing shipping rates alone; pass `--valley=<npr> --rest=<npr> --free-over=<npr>` to change them. Store defaults the owner can change (cash on delivery, stock alerts, guest checkout, decimals, required phone, Nepal-only countries) are applied on the first run only; `wp option delete bsn_setup_done` makes the next run apply them again. `wp bsn setup` also creates the store information pages (About, Contact, Delivery, Returns, Privacy, Terms, FAQ) without overwriting any page the owner edited. Contact details (phone, WhatsApp, email, address) are set in WooCommerce › Settings › General, or with `--phone= --whatsapp= --email=`, and feed the Contact page and footer. WooCommerce's "coming soon" mode hides store pages from visitors until you launch (WooCommerce › Settings › Site visibility).
 
 ## Payments: test mode
 
 - **eSewa:** WooCommerce → Settings → Payments → eSewa. Test mode uses product code `EPAYTEST` and eSewa's public test secret. Live keys come from the client's eSewa merchant account.
-- **Khalti:** configure the official Khalti plugin with sandbox keys from the Khalti merchant dashboard.
+- **Khalti:** plugin slug `integrate-khalti-in-wc-store` ("Integrate Khalti in WC Store", wordpress.org account `khaltiwp`, built by ACT360, linked from khalti.com). Install it with `wp plugin install integrate-khalti-in-wc-store` and leave it **inactive** (see "Khalti status" in [docs/deployment.md](docs/deployment.md)). **Known limitation:** this plugin has no WooCommerce Blocks integration, so it does not render in the block checkout, which this site uses. It ships enabled by default once activated. To try it in sandbox, activate it, enter sandbox keys from the Khalti merchant dashboard in WooCommerce -> Settings -> Payments -> Khalti, and switch it off again afterwards. The storefront only mentions Khalti while its gateway is enabled.
 - Never commit payment keys. They live only in each site's wp-admin settings.
 
 ## Open items from the client
 
-Shop name and logo, domain, eSewa and Khalti merchant accounts, real delivery rates (the plan uses placeholders: Valley NPR 100, rest of Nepal NPR 200, free over NPR 2,000), courier partner, return policy, first 20–30 books. See the proposal's "Next steps" section.
+Shop name and logo, domain, eSewa and Khalti merchant accounts, real delivery rates (the plan uses placeholders: Valley NPR 100, rest of Nepal NPR 200, free on orders of NPR 2,000 or more), courier partner, return policy, first 20–30 books. See the proposal's "Next steps" section.
