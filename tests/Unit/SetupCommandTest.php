@@ -147,6 +147,13 @@ class SetupCommandTest extends WP_UnitTestCase {
 		$this->assertSame( '/%postname%/', get_option( 'permalink_structure' ) );
 	}
 
+	public function test_setup_leaves_rewrite_rules_to_be_rebuilt_on_next_request(): void {
+		$this->set_permalink_structure( '' );
+		update_option( 'rewrite_rules', array( 'stale/?$' => 'index.php?stale=1' ) );
+		( new SetupCommand() )->run( array() );
+		$this->assertEmpty( get_option( 'rewrite_rules' ) );
+	}
+
 	public function test_setup_keeps_existing_permalink_structure(): void {
 		$this->set_permalink_structure( '/blog/%postname%/' );
 		( new SetupCommand() )->run( array() );

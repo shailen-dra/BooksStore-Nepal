@@ -93,13 +93,18 @@ class SetupCommand {
 		if ( '' === (string) get_option( 'permalink_structure' ) ) {
 			global $wp_rewrite;
 			$wp_rewrite->set_permalink_structure( '/%postname%/' );
-			flush_rewrite_rules();
 		}
 
 		$this->enable_cod();
 		$this->ensure_tracking_page();
 
-		return array_merge( Catalog::install(), Shipping::seed( $rates ) );
+		$errors = array_merge( Catalog::install(), Shipping::seed( $rates ) );
+
+		// Rules built in this request would miss post types registered while permalinks were plain and the
+		// attribute taxonomies created above, so let WordPress rebuild them on the next request.
+		delete_option( 'rewrite_rules' );
+
+		return $errors;
 	}
 
 	/**
