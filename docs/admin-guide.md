@@ -156,7 +156,7 @@ To change them:
 
 Always check the result by adding a book to the cart on your website and going to checkout.
 
-When an order qualifies for free delivery, the checkout offers only **Free delivery**; the paid **Delivery** option is hidden. Orders below the amount see only the paid **Delivery** price.
+When an order qualifies for free delivery, the checkout offers **Free delivery** and hides the paid **Delivery** option. Any other option you add to the zone, such as local pickup, still shows. Orders below the amount see the paid **Delivery** price instead.
 
 ![Shipping zones](admin-guide/07-shipping.png)
 

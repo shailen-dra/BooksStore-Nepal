@@ -118,19 +118,38 @@ class ShippingTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'free_shipping', $this->costs( $this->rates_for( 'NP-D-KASKI', 3000 ) ) );
 	}
 
-	public function test_free_delivery_hides_other_rates(): void {
-		$rates = array(
-			'flat_rate:1'     => new WC_Shipping_Rate( 'flat_rate:1', 'Delivery', 100, array(), 'flat_rate' ),
-			'free_shipping:2' => new WC_Shipping_Rate( 'free_shipping:2', 'Free delivery', 0, array(), 'free_shipping' ),
+	private function rate( string $id, string $method, float $cost = 0 ): WC_Shipping_Rate {
+		return new WC_Shipping_Rate( $id, $method, $cost, array(), $method );
+	}
+
+	public function test_free_delivery_hides_flat_rate(): void {
+		$rates  = array(
+			'flat_rate:1'     => $this->rate( 'flat_rate:1', 'flat_rate', 100 ),
+			'free_shipping:2' => $this->rate( 'free_shipping:2', 'free_shipping' ),
 		);
 		$result = Shipping::hide_paid_rates_when_free( $rates );
 		$this->assertSame( array( 'free_shipping:2' ), array_keys( $result ) );
 		$this->assertSame( array( 'free_shipping:2' ), array_keys( apply_filters( 'woocommerce_package_rates', $rates, array() ) ) );
 	}
 
+	public function test_free_delivery_keeps_pickup_and_other_methods(): void {
+		$rates  = array(
+			'flat_rate:1'       => $this->rate( 'flat_rate:1', 'flat_rate', 100 ),
+			'free_shipping:2'   => $this->rate( 'free_shipping:2', 'free_shipping' ),
+			'local_pickup:3'    => $this->rate( 'local_pickup:3', 'local_pickup' ),
+			'pickup_location:0' => $this->rate( 'pickup_location:0', 'pickup_location' ),
+			'courier:4'         => $this->rate( 'courier:4', 'courier', 300 ),
+		);
+		$this->assertSame(
+			array( 'free_shipping:2', 'local_pickup:3', 'pickup_location:0', 'courier:4' ),
+			array_keys( Shipping::hide_paid_rates_when_free( $rates ) )
+		);
+	}
+
 	public function test_rates_without_free_delivery_are_unchanged(): void {
 		$rates = array(
-			'flat_rate:1' => new WC_Shipping_Rate( 'flat_rate:1', 'Delivery', 100, array(), 'flat_rate' ),
+			'flat_rate:1'    => $this->rate( 'flat_rate:1', 'flat_rate', 100 ),
+			'local_pickup:3' => $this->rate( 'local_pickup:3', 'local_pickup' ),
 		);
 		$this->assertSame( $rates, Shipping::hide_paid_rates_when_free( $rates ) );
 	}

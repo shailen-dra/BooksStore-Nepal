@@ -28,7 +28,8 @@ class Shipping {
 	}
 
 	/**
-	 * When free delivery applies, offers only that rate so customers are not shown (or defaulted to) a paid one.
+	 * When free delivery applies, hides the paid flat-rate delivery so customers are not shown (or defaulted to) it.
+	 * Every other method, such as local pickup, stays available.
 	 *
 	 * @param array $rates Rate id => WC_Shipping_Rate.
 	 * @return array
@@ -37,13 +38,20 @@ class Shipping {
 		if ( ! is_array( $rates ) ) {
 			return $rates;
 		}
-		$free = array();
-		foreach ( $rates as $id => $rate ) {
+		$has_free = false;
+		foreach ( $rates as $rate ) {
 			if ( $rate instanceof \WC_Shipping_Rate && 'free_shipping' === $rate->get_method_id() ) {
-				$free[ $id ] = $rate;
+				$has_free = true;
+				break;
 			}
 		}
-		return $free ? $free : $rates;
+		if ( ! $has_free ) {
+			return $rates;
+		}
+		return array_filter(
+			$rates,
+			static fn( $rate ) => ! ( $rate instanceof \WC_Shipping_Rate && 'flat_rate' === $rate->get_method_id() )
+		);
 	}
 
 	/**
