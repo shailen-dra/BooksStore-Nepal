@@ -217,6 +217,14 @@ class EsewaGateway extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Whether payments can be verified in the current mode (product code and secret set).
+	 * Always true in test mode, which uses eSewa's public sandbox credentials.
+	 */
+	public function has_credentials(): bool {
+		return '' !== $this->product_code() && '' !== $this->secret();
+	}
+
+	/**
 	 * eSewa form URL for the current mode.
 	 */
 	public function form_url(): string {
@@ -240,7 +248,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 		if ( 'NPR' !== get_woocommerce_currency() ) {
 			return false;
 		}
-		return '' !== $this->product_code() && '' !== $this->secret();
+		return $this->has_credentials();
 	}
 
 	/**
@@ -599,7 +607,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 		if ( ! $this->amounts_match( $payload['total_amount'], $order ) ) {
 			return sprintf(
 				/* translators: 1: amount reported by eSewa, 2: order total. */
-				__( 'eSewa callback rejected: amount mismatch (eSewa %1$s, order total %2$s).', 'bookstore-nepal' ),
+				__( 'eSewa callback rejected: amount mismatch (eSewa %1$s, order total %2$s). Check the payment in the eSewa merchant portal and refund or reconcile it.', 'bookstore-nepal' ),
 				sanitize_text_field( (string) $payload['total_amount'] ),
 				$this->order_amount( $order )
 			);
@@ -666,7 +674,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 	 * Rejection reason for a COMPLETE status whose amount differs from the order total.
 	 */
 	private function amount_mismatch_message(): string {
-		return __( 'eSewa status check rejected: amount mismatch. Payment not confirmed.', 'bookstore-nepal' );
+		return __( 'eSewa status check rejected: amount mismatch. Payment not confirmed. Check the payment in the eSewa merchant portal and refund or reconcile it.', 'bookstore-nepal' );
 	}
 
 	/**
@@ -1155,6 +1163,6 @@ class EsewaGateway extends WC_Payment_Gateway {
 			 */
 			$timeout = (int) apply_filters( 'bsn_esewa_lock_timeout', self::STATUS_TIMEOUT + 5 );
 		}
-		return $this->acquire_lock( 'bsn_esewa_' . $order_id, $timeout );
+		return $this->lock_order( $order_id, $timeout );
 	}
 }

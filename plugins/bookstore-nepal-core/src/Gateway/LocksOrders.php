@@ -42,9 +42,22 @@ trait LocksOrders {
 	}
 
 	/**
+	 * Takes the order's lock. One name per order, shared by every gateway, so a Khalti return
+	 * and an eSewa callback (or reconciliation) for the same order never run side by side.
+	 * MySQL named locks are re-entrant per connection, so nesting in one request is safe.
+	 *
+	 * @param int $order_id Order ID.
+	 * @param int $timeout  Seconds to wait.
+	 * @return string|null Lock name when held.
+	 */
+	private function lock_order( int $order_id, int $timeout ): ?string {
+		return $this->acquire_lock( 'bsn_order_' . $order_id, $timeout );
+	}
+
+	/**
 	 * Takes a MySQL named lock.
 	 *
-	 * @param string $name    Lock name (e.g. "bsn_esewa_123").
+	 * @param string $name    Lock name (e.g. "bsn_order_123").
 	 * @param int    $timeout Seconds to wait.
 	 * @return string|null Lock name when held.
 	 */

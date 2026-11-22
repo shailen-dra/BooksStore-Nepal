@@ -57,7 +57,7 @@ class EsewaReconciler {
 	 * Guards WooCommerce's auto-cancel of unpaid orders (which also restocks): before an eSewa
 	 * order is cancelled, ask eSewa. Paid → complete it instead; eSewa undecided, unreachable or
 	 * paid for a different amount → don't cancel now (the scheduled check decides later); no
-	 * payment → WooCommerce's decision stands.
+	 * payment → WooCommerce's decision stands. Without live credentials nothing is cancelled.
 	 *
 	 * @param mixed $cancel Whether WooCommerce will cancel the order.
 	 * @param mixed $order  The unpaid order.
@@ -68,10 +68,16 @@ class EsewaReconciler {
 		if ( ! $cancel || ! $order instanceof WC_Order || EsewaGateway::ID !== $order->get_payment_method() ) {
 			return $cancel;
 		}
+		$gateway = EsewaGateway::instance();
+		if ( ! $gateway->has_credentials() ) {
+			// Live mode without keys: a paid order cannot be recognised, so cancelling (and
+			// restocking) could cancel one. Wait until the keys are entered.
+			return false;
+		}
 		if ( self::$api_unavailable ) {
 			return false;
 		}
-		$result = EsewaGateway::instance()->reconcile( $order->get_id() );
+		$result = $gateway->reconcile( $order->get_id() );
 		if ( $result['api_down'] ) {
 			self::$api_unavailable = true;
 		}

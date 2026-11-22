@@ -543,7 +543,7 @@ class KhaltiGatewayTest extends WP_UnitTestCase {
 		$pidx  = $this->pidx( $order );
 		$this->lookups[ $pidx ] = 'Completed';
 		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_khalti_' . $order->get_id() ) ) );
+		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_order_' . $order->get_id() ) ) );
 		add_filter( 'bsn_khalti_lock_timeout', '__return_zero' );
 		$log      = wp_tempnam( 'bsn-khalti-log' );
 		$previous = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet
@@ -552,7 +552,7 @@ class KhaltiGatewayTest extends WP_UnitTestCase {
 		} finally {
 			ini_set( 'error_log', (string) $previous ); // phpcs:ignore WordPress.PHP.IniSet
 			remove_filter( 'bsn_khalti_lock_timeout', '__return_zero' );
-			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_khalti_' . $order->get_id() ) );
+			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_order_' . $order->get_id() ) );
 			$other->close();
 		}
 		$logged = (string) file_get_contents( $log );
@@ -622,6 +622,7 @@ class KhaltiGatewayTest extends WP_UnitTestCase {
 
 		$this->assert_unpaid( $order );
 		$this->assertSame( 1, $this->count_notes_containing( $this->fresh( $order ), 'amount mismatch' ), 'Noted once.' );
+		$this->assertSame( 1, $this->count_notes_containing( $this->fresh( $order ), 'Check the payment in the Khalti merchant portal and refund or reconcile it.' ), 'Staff get refund guidance.' );
 		$this->assertNotEmpty( wc_get_notices( 'error' ) );
 	}
 
@@ -635,6 +636,16 @@ class KhaltiGatewayTest extends WP_UnitTestCase {
 		$this->gateway->handle_return( $this->return_query( $order, $pidx ) );
 		$this->assert_unpaid( $order );
 		$this->assertSame( 1, $this->count_notes_containing( $this->fresh( $order ), 'does not match' ) );
+	}
+
+	public function test_pidx_from_before_modes_were_recorded_is_still_checked(): void {
+		// add_earlier_attempt() stores the list in its old shape (pidx => amount, no mode).
+		$order   = $this->order();
+		$earlier = 'LEGACYpidx000';
+		$order   = $this->add_earlier_attempt( $order, $earlier );
+		$this->lookups[ $earlier ] = 'Completed';
+		$this->gateway->handle_return( $this->return_query( $order, $earlier ) );
+		$this->assertTrue( $this->fresh( $order )->is_paid() );
 	}
 
 	// ---- Return handler: other statuses --------------------------------------------------

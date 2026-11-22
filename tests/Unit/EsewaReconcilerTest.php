@@ -343,11 +343,11 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		$this->statuses[ $this->uuid( $order ) ] = 'COMPLETE';
 		$notes = $this->note_texts( $order );
 		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_esewa_' . $order->get_id() ) ) );
+		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_order_' . $order->get_id() ) ) );
 		try {
 			EsewaReconciler::run();
 		} finally {
-			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_esewa_' . $order->get_id() ) );
+			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_order_' . $order->get_id() ) );
 			$other->close();
 		}
 		$this->assert_untouched( $order, $notes );
@@ -803,6 +803,31 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		$this->assertTrue( $this->should_cancel( $order ) );
 		$this->assertFalse( $this->should_cancel( $order, false ), 'Original value kept.' );
 		$this->assertFalse( $this->fresh( $order )->is_paid() );
+	}
+
+	public function test_auto_cancel_waits_in_live_mode_without_credentials(): void {
+		// Paid in test mode; the owner turns test mode off before entering the live keys.
+		$order = $this->order( 90 );
+		$this->statuses[ $this->uuid( $order ) ] = 'COMPLETE';
+		update_option( 'woocommerce_esewa_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'product_code' => '', 'secret_key' => '' ) );
+		$this->reload_payment_gateways();
+		$this->assertFalse( $this->should_cancel( $order ), 'Nothing can be verified: never cancel (and restock) a possibly paid order.' );
+		$this->assertSame( array(), $this->requested );
+
+		update_option( 'woocommerce_esewa_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'product_code' => 'LIVECODE', 'secret_key' => '' ) );
+		$this->reload_payment_gateways();
+		$this->assertFalse( $this->should_cancel( $order ), 'Product code without a secret is not usable either.' );
+		$this->assertSame( array(), $this->requested );
+	}
+
+	public function test_amount_mismatch_note_tells_staff_to_refund_or_reconcile(): void {
+		$order = $this->order();
+		$this->statuses[ $this->uuid( $order ) ] = array(
+			'status' => 'COMPLETE',
+			'amount' => 100.0,
+		);
+		EsewaReconciler::run();
+		$this->assertSame( 1, $this->count_notes_containing( $this->fresh( $order ), 'Check the payment in the eSewa merchant portal and refund or reconcile it.' ) );
 	}
 
 	public function test_auto_cancel_of_complete_with_wrong_amount_waits_for_staff(): void {

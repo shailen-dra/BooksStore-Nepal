@@ -326,11 +326,11 @@ class KhaltiReconcilerTest extends WP_UnitTestCase {
 		$this->lookups[ $this->pidx( $order ) ] = 'Completed';
 		$notes = $this->note_texts( $order );
 		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_khalti_' . $order->get_id() ) ) );
+		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_order_' . $order->get_id() ) ) );
 		try {
 			KhaltiReconciler::run();
 		} finally {
-			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_khalti_' . $order->get_id() ) );
+			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_order_' . $order->get_id() ) );
 			$other->close();
 		}
 		$this->assert_untouched( $order, $notes );
@@ -682,6 +682,27 @@ class KhaltiReconcilerTest extends WP_UnitTestCase {
 			$this->assertFalse( $this->should_cancel( $order, false ), 'Original value kept.' );
 			$this->assertFalse( $this->fresh( $order )->is_paid() );
 		}
+	}
+
+	public function test_auto_cancel_waits_when_the_current_mode_has_no_key(): void {
+		// Paid in test mode; the owner turns test mode off before entering the live key.
+		$order = $this->order( 90 );
+		$this->lookups[ $this->pidx( $order ) ] = 'Completed';
+		update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'test_secret_key' => self::TEST_KEY, 'secret_key' => '' ) );
+		$this->reload_payment_gateways();
+		$this->assertFalse( $this->should_cancel( $order ), 'Nothing can be verified: never cancel (and restock) a possibly paid order.' );
+		$this->assertSame( array(), $this->requested );
+		$this->assertFalse( $this->fresh( $order )->is_paid() );
+	}
+
+	public function test_amount_mismatch_note_tells_staff_to_refund_or_reconcile(): void {
+		$order = $this->order();
+		$this->lookups[ $this->pidx( $order ) ] = array(
+			'status' => 'Completed',
+			'amount' => 10000,
+		);
+		KhaltiReconciler::run();
+		$this->assertSame( 1, $this->count_notes_containing( $this->fresh( $order ), 'Check the payment in the Khalti merchant portal and refund or reconcile it.' ) );
 	}
 
 	public function test_auto_cancel_of_completed_with_wrong_amount_waits_for_staff(): void {

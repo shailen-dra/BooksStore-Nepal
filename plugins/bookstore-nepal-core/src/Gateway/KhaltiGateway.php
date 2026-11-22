@@ -917,7 +917,7 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	 * Rejection reason for a Completed lookup whose amount differs from the order total.
 	 */
 	private function amount_mismatch_message(): string {
-		return __( 'Khalti lookup rejected: amount mismatch. Payment not confirmed.', 'bookstore-nepal' );
+		return __( 'Khalti lookup rejected: amount mismatch. Payment not confirmed. Check the payment in the Khalti merchant portal and refund or reconcile it.', 'bookstore-nepal' );
 	}
 
 	/**
@@ -1265,6 +1265,6 @@ class KhaltiGateway extends WC_Payment_Gateway {
 			 */
 			$timeout = (int) apply_filters( 'bsn_khalti_lock_timeout', self::TIMEOUT + 5 );
 		}
-		return $this->acquire_lock( 'bsn_khalti_' . $order_id, $timeout );
+		return $this->lock_order( $order_id, $timeout );
 	}
 }
