@@ -30,6 +30,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 	public const API_ACTION        = 'bsn_esewa';
 	public const META_UUID         = '_bsn_esewa_uuid';
 	public const META_REF_ID       = '_bsn_esewa_ref_id';
+	public const META_STRAY_PREFIX = '_bsn_esewa_stray_';
 	public const TEST_PRODUCT_CODE = 'EPAYTEST';
 	// Public UAT secret published in eSewa's developer docs. Live secret lives in settings only.
 	public const TEST_SECRET     = '8gBm/:&EnhH.1/q';
@@ -344,6 +345,14 @@ class EsewaGateway extends WC_Payment_Gateway {
 		$order  = wc_get_order( absint( $query['order_id'] ?? 0 ) );
 		$key    = $query['key'] ?? '';
 
+		if ( $order instanceof WC_Order && self::ID !== $order->get_payment_method() && 'success' === $result
+			&& '' !== $key && hash_equals( $order->get_order_key(), $key ) ) {
+			// The customer paid with eSewa, then switched this order to another method (e.g. cash on delivery).
+			$this->note_stray_payment( $order, $query['data'] ?? '' );
+			wc_add_notice( __( 'This order is no longer set to be paid with eSewa. If money was deducted from your eSewa account, please contact us and we will refund it.', 'bookstore-nepal' ), 'error' );
+			return wc_get_cart_url();
+		}
+
 		if ( ! $order instanceof WC_Order || self::ID !== $order->get_payment_method() || '' === $key || ! hash_equals( $order->get_order_key(), $key ) ) {
 			wc_add_notice( __( 'We could not match this eSewa payment to an order. Please contact us if money was deducted.', 'bookstore-nepal' ), 'error' );
 			return wc_get_cart_url();
@@ -394,6 +403,38 @@ class EsewaGateway extends WC_Payment_Gateway {
 		} finally {
 			$this->unlock( $lock );
 		}
+	}
+
+	/**
+	 * Notes an eSewa success that arrived for an order no longer paid with eSewa, so staff can
+	 * check the merchant portal and refund. Adds one note per transaction.
+	 *
+	 * @param WC_Order $order Order (owner verified by order key).
+	 * @param string   $data  Base64 JSON from eSewa.
+	 */
+	private function note_stray_payment( WC_Order $order, string $data ): void {
+		$json    = base64_decode( str_replace( ' ', '+', $data ), true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+		$payload = false === $json ? null : json_decode( $json, true );
+		$signed  = is_array( $payload ) && EsewaSignature::verify( $payload, $this->secret() );
+		$uuid    = $signed && is_scalar( $payload['transaction_uuid'] ?? null )
+			? sanitize_text_field( (string) $payload['transaction_uuid'] )
+			: (string) $order->get_meta( self::META_UUID );
+		$code    = $signed && is_scalar( $payload['transaction_code'] ?? null ) ? sanitize_text_field( (string) $payload['transaction_code'] ) : '';
+		$noted   = self::META_STRAY_PREFIX . md5( $uuid . '|' . $code );
+		if ( $order->get_meta( $noted ) ) {
+			return;
+		}
+		$order->update_meta_data( $noted, gmdate( 'c' ) );
+		$order->add_order_note(
+			sprintf(
+				/* translators: 1: eSewa transaction UUID, 2: eSewa transaction code or "unknown", 3: "signed by eSewa" or "signature not verified". */
+				__( 'eSewa reported a successful payment for this order after it was switched to another payment method. Transaction UUID: %1$s, transaction code: %2$s (%3$s). Possible payment received: check the eSewa merchant portal and refund the customer if needed.', 'bookstore-nepal' ),
+				'' === $uuid ? __( 'unknown', 'bookstore-nepal' ) : $uuid,
+				'' === $code ? __( 'unknown', 'bookstore-nepal' ) : $code,
+				$signed ? __( 'signed by eSewa', 'bookstore-nepal' ) : __( 'signature not verified', 'bookstore-nepal' )
+			)
+		);
+		$order->save();
 	}
 
 	/**

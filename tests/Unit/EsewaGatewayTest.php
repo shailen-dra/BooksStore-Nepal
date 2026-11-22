@@ -386,6 +386,71 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->fresh( $order )->is_paid() );
 	}
 
+	/**
+	 * Order notes added by the gateway (not system notes from status changes).
+	 */
+	private function note_texts( WC_Order $order ): array {
+		return wp_list_pluck( wc_get_order_notes( array( 'order_id' => $order->get_id() ) ), 'content' );
+	}
+
+	private function switch_to_cod( WC_Order $order ): WC_Order {
+		$order = $this->fresh( $order );
+		$order->set_payment_method( 'cod' );
+		$order->set_payment_method_title( 'Cash on delivery' );
+		$order->save();
+		return $this->fresh( $order );
+	}
+
+	public function test_success_for_order_switched_to_cod_adds_note_and_notice(): void {
+		$order = $this->order();
+		$uuid  = (string) $order->get_meta( EsewaGateway::META_UUID );
+		$query = $this->success_query( $order, $this->payload( $order ) );
+		$order = $this->switch_to_cod( $order );
+
+		$this->assertSame( wc_get_cart_url(), $this->gateway->handle_callback( $query ) );
+
+		$order = $this->fresh( $order );
+		$this->assertSame( 'cod', $order->get_payment_method(), 'Payment method is not changed back.' );
+		$this->assertFalse( $order->is_paid() );
+		$this->assertSame( array(), $this->requested, 'No status API call for a non-eSewa order.' );
+		$notes = implode( "\n", $this->note_texts( $order ) );
+		$this->assertStringContainsString( $uuid, $notes );
+		$this->assertStringContainsString( '0LD5CEH', $notes );
+		$this->assertStringContainsString( 'check the eSewa merchant portal', $notes );
+		$this->assertStringContainsString( 'refund', $notes );
+		$this->assertNotEmpty( wc_get_notices( 'error' ), 'Customer is told too.' );
+	}
+
+	public function test_repeated_stray_success_adds_one_note(): void {
+		$order = $this->order();
+		$query = $this->success_query( $order, $this->payload( $order ) );
+		$order = $this->switch_to_cod( $order );
+		$before = count( $this->note_texts( $order ) );
+		$this->gateway->handle_callback( $query );
+		$this->gateway->handle_callback( $query );
+		$this->assertCount( $before + 1, $this->note_texts( $this->fresh( $order ) ) );
+	}
+
+	public function test_stray_success_with_wrong_key_adds_no_note(): void {
+		$order        = $this->order();
+		$query        = $this->success_query( $order, $this->payload( $order ) );
+		$query['key'] = 'wc_order_guess';
+		$order        = $this->switch_to_cod( $order );
+		$before       = $this->note_texts( $order );
+		$this->assertSame( wc_get_cart_url(), $this->gateway->handle_callback( $query ) );
+		$this->assertSame( $before, $this->note_texts( $this->fresh( $order ) ) );
+	}
+
+	public function test_stray_failure_callback_adds_no_note(): void {
+		$order           = $this->order();
+		$query           = $this->success_query( $order, $this->payload( $order ) );
+		$query['result'] = 'failure';
+		$order           = $this->switch_to_cod( $order );
+		$before          = $this->note_texts( $order );
+		$this->gateway->handle_callback( $query );
+		$this->assertSame( $before, $this->note_texts( $this->fresh( $order ) ) );
+	}
+
 	public function test_callback_status_not_complete_rejected(): void {
 		$order = $this->order();
 		$this->status_api( 'COMPLETE', $order->get_meta( EsewaGateway::META_UUID ) );
