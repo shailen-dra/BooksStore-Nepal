@@ -214,7 +214,7 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 
 		// Another request (separate DB connection) is processing this order.
 		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_esewa_' . $order->get_id() ) ) );
+		$this->assertSame( '1', (string) $other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_order_' . $order->get_id() ) ) );
 		add_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
 		$log      = wp_tempnam( 'bsn-esewa-log' );
 		$previous = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet
@@ -224,7 +224,7 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 		} finally {
 			ini_set( 'error_log', (string) $previous ); // phpcs:ignore WordPress.PHP.IniSet
 			remove_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
-			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_esewa_' . $order->get_id() ) );
+			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_order_' . $order->get_id() ) );
 			$other->close();
 		}
 
@@ -241,7 +241,7 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 	public function test_lock_held_on_failure_return_tells_customer_we_are_checking(): void {
 		$order = $this->order();
 		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
-		$other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_esewa_' . $order->get_id() ) );
+		$other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_order_' . $order->get_id() ) );
 		add_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
 		$log      = wp_tempnam( 'bsn-esewa-log' );
 		$previous = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet
@@ -257,7 +257,7 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 			ini_set( 'error_log', (string) $previous ); // phpcs:ignore WordPress.PHP.IniSet
 			unlink( $log );
 			remove_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
-			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_esewa_' . $order->get_id() ) );
+			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_order_' . $order->get_id() ) );
 			$other->close();
 		}
 		$notices = wp_list_pluck( wc_get_notices( 'notice' ), 'notice' );
@@ -451,6 +451,16 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 		$this->status_api( 'COMPLETE', $order->get_meta( EsewaGateway::META_UUID ), 100.0 );
 		$this->gateway->handle_callback( $this->success_query( $order, $this->payload( $order ) ) );
 		$this->assert_unpaid_with_note( $order, 'status check rejected: amount mismatch' );
+	}
+
+	public function test_amount_mismatch_notes_tell_staff_to_refund_or_reconcile(): void {
+		$order = $this->order();
+		$this->status_api( 'COMPLETE', $order->get_meta( EsewaGateway::META_UUID ), 100.0 );
+		$this->gateway->handle_callback( $this->success_query( $order, $this->payload( $order, array( 'total_amount' => '100.0' ) ) ) );
+		wc_clear_notices();
+		$this->gateway->handle_callback( $this->success_query( $order, $this->payload( $order ) ) );
+		$notes = $this->note_texts( $this->fresh( $order ) );
+		$this->assertCount( 2, array_filter( $notes, static fn( $note ) => false !== strpos( $note, 'amount mismatch' ) && false !== strpos( $note, 'Check the payment in the eSewa merchant portal and refund or reconcile it.' ) ), 'Callback and status-check mismatch notes both guide staff.' );
 	}
 
 	public function test_status_api_other_transaction_rejected(): void {

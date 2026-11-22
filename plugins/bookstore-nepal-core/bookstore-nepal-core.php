@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       Bookstore Nepal Core
- * Description:       Catalogue attributes, Nepal shipping, eSewa gateway, gift finder and store setup for Bookstore Nepal.
+ * Description:       Catalogue attributes, Nepal shipping, eSewa and Khalti gateways, gift finder and store setup for Bookstore Nepal.
  * Version:           0.1.0
  * Requires PHP:      8.1
  * Requires Plugins:  woocommerce
@@ -54,6 +54,10 @@ add_action( 'before_woocommerce_init', array( \BookstoreNepal\Gateway\EsewaGatew
 add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\EsewaGateway::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\EsewaReconciler::class, 'register' ) );
 register_deactivation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Gateway\EsewaReconciler::class, 'unschedule' ) );
+// EsewaGateway::declare_compatibility() above declares HPOS and block checkout support for the whole plugin, Khalti included.
+add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\KhaltiGateway::class, 'register' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\KhaltiReconciler::class, 'register' ) );
+register_deactivation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Gateway\KhaltiReconciler::class, 'unschedule' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\OrderStatuses::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Cli\SetupCommand::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\GiftFinder::class, 'register' ) );

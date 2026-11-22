@@ -262,7 +262,7 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<form class="bsn-gift-finder"', $html );
 	}
 
-	/** @var WC_Payment_Gateway|null Stand-in for the Khalti plugin's gateway. */
+	/** @var WC_Payment_Gateway|null Stand-in for the third-party Khalti plugin's gateway (id "khalti"). */
 	private $fake_khalti = null;
 
 	/** @var bool Whether a test reloaded the payment gateways. */
@@ -277,27 +277,37 @@ class ThemeTest extends WP_UnitTestCase {
 	 * Configures gateways and reloads them, as on a fresh request.
 	 *
 	 * @param array       $enabled Gateway id => 'yes'|'no' for esewa and cod.
-	 * @param string|null $khalti  'yes'|'no' to register a Khalti gateway, null for not installed.
+	 * @param string|null $khalti  'yes'|'no' for our Khalti gateway (bsn_khalti, with a fake test key), null for no settings.
 	 */
 	private function payments( array $enabled, ?string $khalti = null ): void {
 		$this->gateways_changed = true;
 		update_option( 'woocommerce_currency', 'NPR' );
 		update_option( 'woocommerce_esewa_settings', array( 'enabled' => $enabled['esewa'] ?? 'no', 'testmode' => 'yes' ) );
 		update_option( 'woocommerce_cod_settings', array( 'enabled' => $enabled['cod'] ?? 'no', 'enable_for_methods' => array(), 'enable_for_virtual' => 'no' ) );
+		if ( null === $khalti ) {
+			delete_option( 'woocommerce_bsn_khalti_settings' );
+		} else {
+			update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => $khalti, 'testmode' => 'yes', 'test_secret_key' => 'test_secret_key_fake_0000' ) );
+		}
 		remove_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
 		$this->fake_khalti = null;
-		if ( null !== $khalti ) {
-			update_option( 'woocommerce_khalti_settings', array( 'enabled' => $khalti ) );
-			$this->fake_khalti = new class() extends WC_Payment_Gateway {
-				public function __construct() {
-					$this->id    = 'khalti';
-					$this->title = 'Khalti';
-					$this->init_settings();
-					$this->enabled = $this->get_option( 'enabled', 'no' );
-				}
-			};
-			add_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
-		}
+		$this->reload_payment_gateways();
+	}
+
+	/**
+	 * Registers an enabled stand-in for the third-party plugin's "khalti" gateway.
+	 */
+	private function add_third_party_khalti(): void {
+		update_option( 'woocommerce_khalti_settings', array( 'enabled' => 'yes' ) );
+		$this->fake_khalti = new class() extends WC_Payment_Gateway {
+			public function __construct() {
+				$this->id    = 'khalti';
+				$this->title = 'Khalti';
+				$this->init_settings();
+				$this->enabled = $this->get_option( 'enabled', 'no' );
+			}
+		};
+		add_filter( 'woocommerce_payment_gateways', array( $this, 'add_fake_khalti' ) );
 		$this->reload_payment_gateways();
 	}
 
@@ -311,9 +321,9 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'yes' );
 		$this->assertSame(
 			array(
-				'esewa'  => 'eSewa',
-				'khalti' => 'Khalti',
-				'cod'    => 'Cash on delivery',
+				'esewa'      => 'eSewa',
+				'bsn_khalti' => 'Khalti',
+				'cod'        => 'Cash on delivery',
 			),
 			Theme::payment_methods()
 		);
@@ -329,6 +339,18 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->payments( array( 'cod' => 'yes' ) );
 		$this->assertSame( array( 'cod' ), array_keys( Theme::payment_methods() ) );
 		$this->assertSame( 'cash on delivery', Theme::payment_list() );
+	}
+
+	public function test_payment_methods_skip_khalti_without_a_key_and_the_third_party_gateway(): void {
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'yes' );
+		update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => 'yes', 'testmode' => 'yes', 'test_secret_key' => '' ) );
+		$this->reload_payment_gateways();
+		$this->assertSame( array( 'esewa', 'cod' ), array_keys( Theme::payment_methods() ), 'Our Khalti without a key is not offered.' );
+
+		// The third-party plugin's gateway (no block checkout support) is never advertised.
+		$this->add_third_party_khalti();
+		$this->assertSame( array( 'esewa', 'cod' ), array_keys( Theme::payment_methods() ) );
+		$this->assertSame( 'eSewa and cash on delivery', Theme::payment_list() );
 	}
 
 	public function test_payment_methods_skip_esewa_that_cannot_take_payments(): void {

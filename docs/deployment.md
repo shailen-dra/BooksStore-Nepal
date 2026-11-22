@@ -27,10 +27,7 @@ Run WP-CLI commands from the WordPress directory, or pass `--path=`.
    ```bash
    wp plugin install woocommerce --activate
    ```
-3. Install the Khalti plugin, but leave it inactive for now (see "Khalti status" below):
-   ```bash
-   wp plugin install integrate-khalti-in-wc-store
-   ```
+3. **Do not install** the third-party Khalti plugin (`integrate-khalti-in-wc-store`). It does not work with the block checkout this site uses; Khalti is built into our plugin (see "Khalti" in section 3). If it is already installed, deactivate it: `wp plugin deactivate integrate-khalti-in-wc-store`.
 4. Copy this repo's plugin and theme to the server:
    - `plugins/bookstore-nepal-core/` to `wp-content/plugins/bookstore-nepal-core/`
    - `themes/bookstore-nepal/` to `wp-content/themes/bookstore-nepal/`
@@ -74,13 +71,13 @@ Never commit payment keys. Enter them only in the live site's wp-admin.
 2. Go to **WooCommerce › Settings › Payments** and open **eSewa**.
 3. Enter **Live product code** and **Live secret key**.
    ![eSewa settings](admin-guide/08-esewa.png)
-4. **Untick Test mode** ("Use the eSewa sandbox"). While test mode is ticked, the live code and secret are ignored and the sandbox (product code `EPAYTEST`) is used, so real money is never taken.
+4. **Untick Test mode** ("Use the eSewa sandbox"). While test mode is ticked, the live code and secret are ignored and the sandbox (product code `EPAYTEST`) is used, so real money is never taken. Enter the live code and secret first: while test mode is off without them, eSewa is hidden at checkout and unpaid eSewa orders are **not** cancelled automatically (the website cannot check them).
 5. Tick **Enable eSewa** and click **Save changes**.
 6. Place a real low-value order with eSewa and confirm the order moves to **Processing**. Refund it in eSewa afterwards.
 
 #### Scheduled tasks (WP-Cron / Action Scheduler)
 
-The eSewa automatic payment check runs every 5 minutes through Action Scheduler (part of WooCommerce), as do WooCommerce's own jobs such as cancelling unpaid orders and sending deferred emails. Action Scheduler is started by WP-Cron, and WP-Cron by default only runs when someone visits the site, so on a quiet site the check can be late. On the live server:
+The eSewa and Khalti automatic payment checks run every 5 minutes through Action Scheduler (part of WooCommerce), as do WooCommerce's own jobs such as cancelling unpaid orders and sending deferred emails. Action Scheduler is started by WP-Cron, and WP-Cron by default only runs when someone visits the site, so on a quiet site the check can be late. On the live server:
 
 1. Add `define( 'DISABLE_WP_CRON', true );` to `wp-config.php`.
 2. Add a system cron job that runs every minute, either:
@@ -96,11 +93,24 @@ To check it is working, open **WooCommerce › Status › Scheduled Actions**, s
 
 Test mode is on by default. Check this setting before launch and after any restore of a staging database onto the live site.
 
-### Khalti status
+**Switching a live shop back to test mode** (eSewa or Khalti) holds every unpaid order that has a live payment attempt: the sandbox cannot check real payments, so these orders are not completed or cancelled automatically. Each gets a note ("eSewa payment started in live mode — check the live merchant portal" / "Khalti payment started in live mode — check the Khalti merchant dashboard"). Check them by hand in the live merchant portal, or switch back to live mode, where they are checked again as usual. Test-mode attempts seen from live mode are never real money and do not hold an order.
 
-The Khalti plugin (`integrate-khalti-in-wc-store`) has no support for WooCommerce's block checkout, which this site uses, so Khalti does not appear at checkout. It is also enabled by default when installed. **Keep Khalti disabled until this is resolved**: leave the plugin inactive, or in **WooCommerce › Settings › Payments** make sure Khalti is switched off. Do not tell the client Khalti is available.
+### Khalti
 
-Once a working option exists (a plugin version with block-checkout support, or a custom Khalti gateway like our eSewa one), enter the live keys from the Khalti merchant dashboard in the Khalti payment settings, turn test mode off, enable it, and repeat the real low-value order test.
+Khalti (Web Checkout, KPG-2) is a gateway in our plugin, shown in the block checkout like eSewa. Customers are sent to Khalti to pay; the order is marked paid only after Khalti's lookup API confirms the payment for the exact order total.
+
+1. Get the **live secret key** from the client's Khalti merchant dashboard (https://admin.khalti.com).
+2. Go to **WooCommerce › Settings › Payments** and open **Khalti** (our gateway; its settings page is `section=bsn_khalti`).
+3. Enter the **Live secret key**.
+4. **Untick Test mode**. While test mode is ticked, the live key is ignored and the sandbox (`dev.khalti.com`) is used with the **Test secret key**. Enter the live key first: while the current mode has no key, Khalti is hidden at checkout and unpaid Khalti orders are **not** cancelled automatically (the website cannot check them). Payments started in test mode are not checked once live mode is on (and the reverse); each such order gets a note saying which Khalti dashboard to check.
+5. Tick **Enable Khalti** and click **Save changes**. Khalti only appears at checkout when the store currency is NPR and the key for the current mode is filled in.
+6. Place a real low-value order with Khalti (Khalti's minimum is NPR 10) and confirm the order moves to **Processing**. Refund it in the Khalti merchant dashboard afterwards.
+
+**Sandbox testing.** Sign up as a merchant at https://test-admin.khalti.com (login OTP `987654`), copy the test secret key into **Test secret key** and keep **Test mode** ticked. On Khalti's test payment page use one of the test Khalti IDs `9800000000`–`9800000005`, MPIN `1111` and OTP `987654`.
+
+Do not install or activate the third-party plugin `integrate-khalti-in-wc-store`: it has no block checkout support, and two Khalti gateways would confuse staff. The storefront payment copy (trust strip, footer, delivery text) mentions Khalti automatically once our gateway is enabled and has a key.
+
+A Khalti automatic payment check (`bsn_khalti_reconcile`, group `bsn`) runs every 5 minutes, like the eSewa one; see "Scheduled tasks" above. Failed lookups are logged as lines starting "Bookstore Nepal Khalti:".
 
 ### Cash on delivery
 
@@ -111,7 +121,8 @@ Enabled by the first `wp bsn setup` run. Later runs do not touch it, so if the o
 - Place one order each with cash on delivery to a Kathmandu Valley address and to another district. Check the delivery price, the order email and the order in **WooCommerce › Orders**.
 - Place an order of NPR 2,000 or more (or the client's free-delivery amount) and confirm delivery is free.
 - Confirm an out-of-stock book cannot be added to the cart.
-- Confirm the `bsn_esewa_reconcile` scheduled action is pending and has recent completed runs (see "Scheduled tasks" in section 3).
+- Confirm the `bsn_esewa_reconcile` and `bsn_khalti_reconcile` scheduled actions are pending and have recent completed runs (see "Scheduled tasks" in section 3).
+- Place one Khalti order (real, low value, then refund it) and confirm it moves to **Processing**.
 - Confirm the site is **Live** (Site visibility), HTTPS works with no mixed-content warnings, and the footer and information pages have no `[CLIENT ...]` placeholders.
 - Confirm the checkout shows working links to the Terms & conditions and Privacy policy, and that the Privacy, Terms and Returns pages were reviewed with the client.
 - Delete or set to draft any sample or test books and test orders.
