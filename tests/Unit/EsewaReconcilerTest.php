@@ -660,11 +660,15 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		$this->assertFalse( as_next_scheduled_action( EsewaReconciler::HOOK, array(), 'bsn' ) );
 	}
 
-	public function test_maybe_schedule_runs_for_admin_and_cron_requests(): void {
+	public function test_maybe_schedule_skips_front_end_page_views(): void {
 		EsewaReconciler::unschedule();
 		EsewaReconciler::maybe_schedule();
-		$this->assertFalse( as_next_scheduled_action( EsewaReconciler::HOOK, array(), 'bsn' ), 'Not on front-end page views.' );
+		$this->assertFalse( as_next_scheduled_action( EsewaReconciler::HOOK, array(), 'bsn' ) );
+		$this->assertFalse( EsewaReconciler::is_scheduling_request( false ) );
+	}
 
+	public function test_maybe_schedule_runs_for_admin_requests(): void {
+		EsewaReconciler::unschedule();
 		set_current_screen( 'dashboard' );
 		try {
 			EsewaReconciler::maybe_schedule();
@@ -673,6 +677,23 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 			$GLOBALS['current_screen'] = null;
 		}
 		$this->assertNotFalse( as_next_scheduled_action( EsewaReconciler::HOOK, array(), 'bsn' ) );
+	}
+
+	public function test_maybe_schedule_runs_for_cron_requests(): void {
+		EsewaReconciler::unschedule();
+		add_filter( 'wp_doing_cron', '__return_true' );
+		try {
+			EsewaReconciler::maybe_schedule();
+		} finally {
+			remove_filter( 'wp_doing_cron', '__return_true' );
+		}
+		$this->assertNotFalse( as_next_scheduled_action( EsewaReconciler::HOOK, array(), 'bsn' ) );
+	}
+
+	public function test_wp_cli_requests_schedule(): void {
+		// WP_CLI cannot be defined here without leaking into every later test, so the check takes it as an argument.
+		$this->assertFalse( defined( 'WP_CLI' ) && WP_CLI, 'Precondition: not under WP-CLI.' );
+		$this->assertTrue( EsewaReconciler::is_scheduling_request( true ) );
 	}
 
 	/**

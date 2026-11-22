@@ -89,9 +89,19 @@ class EsewaReconciler {
 	 * views to save the lookup there (admin, cron, Action Scheduler and WP-CLI requests do it).
 	 */
 	public static function maybe_schedule(): void {
-		if ( is_admin() || wp_doing_cron() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
+		if ( self::is_scheduling_request( defined( 'WP_CLI' ) && WP_CLI ) ) {
 			self::schedule();
 		}
+	}
+
+	/**
+	 * Whether this request should make sure the check is scheduled: wp-admin (including Action
+	 * Scheduler's async runner), WP-Cron or WP-CLI.
+	 *
+	 * @param bool $is_cli Whether this is a WP-CLI request.
+	 */
+	public static function is_scheduling_request( bool $is_cli ): bool {
+		return is_admin() || wp_doing_cron() || $is_cli;
 	}
 
 	/**
