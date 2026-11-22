@@ -100,7 +100,11 @@ To change many orders at once: on the **WooCommerce › Orders** list, tick the 
 
 **Cash on delivery (COD) orders.** The customer pays the rider when the books arrive, so a COD order shows as **Processing** from the start, even though no money has been received. Pack and ship it as normal. When the rider confirms the cash was collected and the books were handed over, set the order to **Delivered**. That is how you confirm payment for a COD order. If the customer refuses the parcel, set it to **Cancelled**, and the books go back into stock.
 
-**eSewa orders.** The order moves to **Processing** by itself once eSewa confirms the payment. If a customer started paying but never finished, the order stays on **Pending payment**. You can ignore it. The customer can also place a new order and choose cash on delivery instead.
+**eSewa orders.** The order moves to **Processing** by itself once eSewa confirms the payment. If a customer started paying but never finished, the order stays on **Pending payment** (or becomes **Failed** if they cancelled on the eSewa page). The customer can place a new order and choose cash on delivery instead.
+
+Before you cancel such an order or put its books back into stock, log in to the **eSewa merchant portal** and search for a transaction for that order (the order number and amount). The website cannot yet check this for you. If eSewa shows the money was received, treat the order as paid: set it to **Processing** and pack it, or refund the customer from the eSewa portal. Only cancel the order if eSewa shows no completed payment.
+
+If an order has a note starting "eSewa reported a successful payment for this order after it was switched to another payment method", the customer probably paid with eSewa and then changed the order to cash on delivery. Look up the transaction in the eSewa merchant portal using the transaction UUID in the note, and refund the eSewa payment (or collect no cash on delivery) so the customer does not pay twice.
 
 **Customers can track their order** on the "Track your order" page of the website, using their order number and email.
 
