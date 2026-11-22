@@ -9,6 +9,19 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+$bsn_search = serialize_block_attributes(
+	array(
+		'label'          => __( 'Search books', 'bookstore-nepal' ),
+		'showLabel'      => false,
+		'placeholder'    => __( 'Search by title, author or topic', 'bookstore-nepal' ),
+		'buttonText'     => __( 'Search', 'bookstore-nepal' ),
+		'buttonPosition' => 'button-outside',
+		'buttonUseIcon'  => true,
+		'query'          => array( 'post_type' => 'product' ),
+		'className'      => 'bsn-search bsn-hero__search',
+	)
+);
 ?>
 <!-- wp:group {"align":"wide","className":"bsn-hero","layout":{"type":"default"}} -->
 <div class="wp-block-group alignwide bsn-hero"><!-- wp:group {"className":"bsn-hero__text","layout":{"type":"default"}} -->
@@ -24,7 +37,7 @@ defined( 'ABSPATH' ) || exit;
 <p class="bsn-hero__lead"><?php esc_html_e( 'Picture books, stories and activity books in Nepali and English — chosen by age, delivered to your door.', 'bookstore-nepal' ); ?></p>
 <!-- /wp:paragraph -->
 
-<!-- wp:search {"label":"<?php echo esc_attr__( 'Search books', 'bookstore-nepal' ); ?>","showLabel":false,"placeholder":"<?php echo esc_attr__( 'Search by title, author or topic', 'bookstore-nepal' ); ?>","buttonText":"<?php echo esc_attr__( 'Search', 'bookstore-nepal' ); ?>","buttonPosition":"button-outside","buttonUseIcon":true,"query":{"post_type":"product"},"className":"bsn-search bsn-hero__search"} /-->
+<!-- wp:search <?php echo $bsn_search; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Block attributes JSON; the search block escapes them when rendering. ?> /-->
 
 <!-- wp:buttons {"className":"bsn-hero__actions"} -->
 <div class="wp-block-buttons bsn-hero__actions"><!-- wp:button -->

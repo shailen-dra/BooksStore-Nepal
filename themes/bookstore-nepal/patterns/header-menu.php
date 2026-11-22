@@ -80,7 +80,19 @@ $bsn_tracking = Theme::tracking_url();
 if ( null !== $bsn_tracking ) {
 	$bsn_items .= $bsn_link( __( 'Track your order', 'bookstore-nepal' ), $bsn_tracking, 'bsn-nav-track' );
 }
+$bsn_nav = serialize_block_attributes(
+	array(
+		'overlayMenu'         => 'mobile',
+		'openSubmenusOnClick' => true,
+		'className'           => 'bsn-nav',
+		'ariaLabel'           => __( 'Main', 'bookstore-nepal' ),
+		'layout'              => array(
+			'type'     => 'flex',
+			'flexWrap' => 'wrap',
+		),
+	)
+);
 ?>
-<!-- wp:navigation {"overlayMenu":"mobile","openSubmenusOnClick":true,"className":"bsn-nav","ariaLabel":"<?php echo esc_attr__( 'Main', 'bookstore-nepal' ); ?>","layout":{"type":"flex","flexWrap":"wrap"}} -->
+<!-- wp:navigation <?php echo $bsn_nav; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Block attributes JSON; the navigation block escapes them when rendering. ?> -->
 <?php echo $bsn_items; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Serialized blocks; attributes escaped above. ?>
 <!-- /wp:navigation -->

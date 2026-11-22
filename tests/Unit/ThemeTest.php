@@ -361,6 +361,33 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'Cash on delivery', $this->render_pattern( 'trust-strip' ) );
 	}
 
+	public function test_translations_with_quotes_keep_pattern_block_attributes_valid(): void {
+		$tricky = static fn( $translation, $text, $domain ) => 'bookstore-nepal' === $domain ? $text . ' "x" \\ y' : $translation;
+		add_filter( 'gettext', $tricky, 10, 3 );
+		$attrs = array();
+		foreach ( array( 'hero', 'header-menu' ) as $slug ) {
+			foreach ( parse_blocks( $this->render_pattern( $slug ) ) as $block ) {
+				$this->collect_attrs( $block, $attrs );
+			}
+		}
+		remove_filter( 'gettext', $tricky, 10 );
+		$this->assertSame( 'Search books "x" \\ y', $attrs['core/search']['label'] );
+		$this->assertSame( 'Search by title, author or topic "x" \\ y', $attrs['core/search']['placeholder'] );
+		$this->assertSame( 'Main "x" \\ y', $attrs['core/navigation']['ariaLabel'] );
+	}
+
+	/**
+	 * Block name => attributes, for a block and its inner blocks (first of each name wins).
+	 */
+	private function collect_attrs( array $block, array &$attrs ): void {
+		if ( $block['blockName'] && ! isset( $attrs[ $block['blockName'] ] ) ) {
+			$attrs[ $block['blockName'] ] = $block['attrs'];
+		}
+		foreach ( $block['innerBlocks'] as $inner ) {
+			$this->collect_attrs( $inner, $attrs );
+		}
+	}
+
 	public function test_footer_uses_payments_pattern_not_static_copy(): void {
 		$footer = (string) file_get_contents( dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/parts/footer.html' );
 		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/footer-payments"} /-->', $footer );
