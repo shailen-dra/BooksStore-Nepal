@@ -36,7 +36,7 @@ Contents:
 
 ![Price, author and page count on the General tab](admin-guide/02-book-details.png)
 
-Tip: to add a book that is similar to an existing one, go to **Products › All Products**, hover over the book and click **Duplicate**, then change the details.
+Tip: to add a book that is similar to an existing one, go to **Products › All Products**, hover over the book's name until the links appear under it, and click **Duplicate**, then change the details.
 
 ## 2. Change a price or put a book on sale
 
@@ -81,18 +81,22 @@ When a customer places an order, you receive an email, and the order appears und
 | **On hold** | Needs your attention before going on. |
 | **Cancelled** / **Refunded** / **Failed** | Order did not go ahead. |
 
+![The orders list](admin-guide/04-orders.png)
+
 Step by step:
 
-1. Go to **WooCommerce › Orders** and click an order to open it. You see the customer's name, phone number, delivery address and the books ordered. The payment method (eSewa or Cash on delivery) is shown near the top.
+1. Go to **WooCommerce › Orders** and click an order to open it. You see the customer's name, phone number, delivery address and the books ordered. The payment method is shown under the order number, for example "Payment via Cash on delivery".
 2. Pack the books. Then change the status:
-   1. In the **Status** box at the top left of the order, choose **Packed**.
-   2. Click **Update**.
+   1. In the **Status** drop-down under **General** (at the top of the order), choose **Packed**.
+   2. Click the blue **Update** button at the top right, in the **Order actions** box.
 3. When the courier takes the parcel, set the status to **Shipped** and click **Update**.
 4. When the customer has received it, set the status to **Delivered** and click **Update**.
 
+![An open order with the Status drop-down and Update button](admin-guide/09-order.png)
+
 The customer gets an email when the order is first confirmed and when it is marked **Delivered**.
 
-To change many orders at once: on the **WooCommerce › Orders** list, tick the orders, choose **Change status to packed** or **Change status to shipped** from **Bulk actions**, and click **Apply**.
+To change many orders at once: on the **WooCommerce › Orders** list, tick the orders, choose **Change status to packed**, **Change status to shipped** or **Change status to completed** from **Bulk actions**, and click **Apply**. ("Completed" is the same as **Delivered**; the bulk menu uses WooCommerce's original name for it.)
 
 **Cash on delivery (COD) orders.** The customer pays the rider when the books arrive, so a COD order shows as **Processing** from the start, even though no money has been received. Pack and ship it as normal. When the rider confirms the cash was collected and the books were handed over, set the order to **Delivered**. That is how you confirm payment for a COD order. If the customer refuses the parcel, set it to **Cancelled**, and the books go back into stock.
 
@@ -109,6 +113,7 @@ To change many orders at once: on the **WooCommerce › Orders** list, tick the 
    - **Coupon amount**: the percentage or rupee amount.
    - **Coupon expiry date**: when the code stops working (optional but recommended).
 4. On the **Usage restriction** tab you can set a **Minimum spend** for the code to work.
+   (The tabs are **General**, **Usage restriction** and **Usage limits**.)
 5. On the **Usage limits** tab you can limit how many times the code can be used in total (**Usage limit per coupon**) and by each customer (**Usage limit per user**).
 6. Click **Publish**.
 
@@ -146,6 +151,8 @@ To change them:
 5. Do the same in the other zone. Use the same free-delivery amount in both zones, so customers everywhere get the same offer.
 
 Always check the result by adding a book to the cart on your website and going to checkout.
+
+When an order qualifies for free delivery, the checkout offers only **Free delivery**; the paid **Delivery** option is hidden. Orders below the amount see only the paid **Delivery** price.
 
 ![Shipping zones](admin-guide/07-shipping.png)
 

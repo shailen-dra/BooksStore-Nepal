@@ -56,9 +56,9 @@ Run WP-CLI commands from the WordPress directory, or pass `--path=`.
 ### Content and branding checklist
 
 - **Footer contact details.** The footer has placeholders such as `[CLIENT PHONE – edit in Site Editor › Footer]`, `[CLIENT WHATSAPP …]` and `[CLIENT SHOP ADDRESS …]`. Replace them in **Appearance › Editor › Patterns › Footer** (the footer is also reachable from Appearance › Editor › Templates/Parts). Search the live site for the word "CLIENT" afterwards to be sure none are left.
-- **Refund and Returns Policy.** WooCommerce creates a draft page for this. Write the policy with the client, then publish it in **Pages**. The "Returns & refunds" link in the footer stays hidden until that page is published.
+- **Refund and Returns Policy.** WooCommerce creates a draft page for this. Write the policy with the client, then publish it in **Pages** (it is listed as "Refund and Returns Policy" under Drafts). The "Returns & refunds" link in the footer stays hidden until that page is published.
 - **Site icon and logo.** Once the client's logo exists, set the site icon in **Settings › General** (Site Icon) or **Appearance › Editor**, and add the logo to the header in the Site Editor.
-- **Currency symbol.** WooCommerce shows the Nepali rupee as ₨ (for example ₨1,800). That is fine to leave. To change how it displays, see **WooCommerce › Settings › General › Currency options**; some clients prefer "Rs" or "NPR", which needs a small code or plugin tweak, not a setting.
+- **Currency symbol.** WooCommerce shows the Nepali rupee as ₨ (for example ₨1,800). That is fine to leave. Under **WooCommerce › Settings › General › Currency options** you can only pick the currency (Nepalese rupee (₨) — NPR) and the **Currency position** (Left, Right, Left with space, Right with space). There is no setting for the symbol itself; showing "Rs" or "NPR" instead of ₨ needs a small code snippet using WooCommerce's `woocommerce_currency_symbol` filter, or a plugin.
 - **Emails.** In **WooCommerce › Settings › Emails**, check the sender name and address, and add the shop logo and footer text.
 - **Admin email.** Low-stock and new-order emails go to the address in **Settings › General** (Administration Email Address) and **WooCommerce › Settings › Emails**. Make sure it is monitored.
 
@@ -71,6 +71,7 @@ Never commit payment keys. Enter them only in the live site's wp-admin.
 1. Get the live **product code** and **secret key** from the client's eSewa merchant account.
 2. Go to **WooCommerce › Settings › Payments** and open **eSewa**.
 3. Enter **Live product code** and **Live secret key**.
+   ![eSewa settings](admin-guide/08-esewa.png)
 4. **Untick Test mode** ("Use the eSewa sandbox"). While test mode is ticked, the live code and secret are ignored and the sandbox (product code `EPAYTEST`) is used, so real money is never taken.
 5. Tick **Enable eSewa** and click **Save changes**.
 6. Place a real low-value order with eSewa and confirm the order moves to **Processing**. Refund it in eSewa afterwards.
