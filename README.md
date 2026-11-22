@@ -63,6 +63,8 @@ cd /path/to/this/repo
 bash bin/link-local.sh
 wp --path=~/Herd/bookstore-nepal plugin activate bookstore-nepal-core
 wp --path=~/Herd/bookstore-nepal bsn setup
+wp --path=~/Herd/bookstore-nepal theme activate bookstore-nepal
+bash bin/seed-sample-books.sh   # optional: 12 sample books
 
 # 3. Tests
 composer install
@@ -71,7 +73,7 @@ vendor/bin/phpunit
 # Optional env: WP_TESTS_DIR (default: system temp dir/wordpress-tests-lib), WC_PLUGIN_DIR (default: the Herd site's WooCommerce)
 ```
 
-> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. `wp bsn setup` leaves existing shipping rates alone; pass `--valley=<npr> --rest=<npr> --free-over=<npr>` to change them. The theme arrives in a later task; `bin/link-local.sh` skips the theme until it exists.
+> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. `wp bsn setup` leaves existing shipping rates alone; pass `--valley=<npr> --rest=<npr> --free-over=<npr>` to change them. Placeholder contact details (phone, WhatsApp, address) live in the theme footer: Appearance › Editor › Patterns › Footer. WooCommerce's "coming soon" mode hides store pages from visitors until you launch (WooCommerce › Settings › Site visibility).
 
 ## Payments: test mode
 
