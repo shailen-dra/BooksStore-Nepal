@@ -713,6 +713,39 @@ class KhaltiReconcilerTest extends WP_UnitTestCase {
 		$this->assertSame( array(), $this->requested );
 	}
 
+	public function test_live_pidx_while_in_test_mode_holds_the_order_and_is_noted_once(): void {
+		// A real (live) payment attempt; the owner then switches the shop to test mode.
+		update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'test_secret_key' => self::TEST_KEY, 'secret_key' => 'live_secret_key_fake_1111' ) );
+		$this->reload_payment_gateways();
+		$this->gateway = new KhaltiGateway();
+		$order         = $this->order( 90 );
+		$pidx          = $this->pidx( $order );
+		$this->lookups[ $pidx ] = 'Expired'; // What the sandbox might say about a pidx it does not know.
+		update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => 'yes', 'testmode' => 'yes', 'test_secret_key' => self::TEST_KEY, 'secret_key' => 'live_secret_key_fake_1111' ) );
+		$this->reload_payment_gateways();
+
+		$this->assertFalse( $this->should_cancel( $order ), 'Real money that cannot be checked from test mode: hold.' );
+		KhaltiReconciler::run();
+		KhaltiReconciler::run();
+
+		$order = $this->fresh( $order );
+		$this->assertSame( array(), $this->requested, 'A live pidx is never looked up in the sandbox.' );
+		$this->assertFalse( $order->is_paid() );
+		$this->assertSame( 'pending', $order->get_status() );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'Khalti payment started in live mode — check the Khalti merchant dashboard' ) );
+		$this->assertFalse( $this->should_cancel( $order ), 'Still held on later passes.' );
+	}
+
+	public function test_pidx_without_a_recorded_mode_keeps_being_checked_in_the_current_mode(): void {
+		$order = $this->order( 90 );
+		$pidx  = $this->pidx( $order );
+		$order->update_meta_data( KhaltiGateway::META_PIDXS, array( $pidx => '50000' ) ); // Old list shape.
+		$order->save();
+		$this->lookups[ $pidx ] = 'Expired';
+		$this->assertTrue( $this->should_cancel( $this->fresh( $order ) ) );
+		$this->assertSame( array( $pidx ), $this->requested );
+	}
+
 	public function test_pidx_of_the_current_mode_is_still_checked_beside_one_from_the_other_mode(): void {
 		update_option( 'woocommerce_bsn_khalti_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'test_secret_key' => self::TEST_KEY, 'secret_key' => 'live_secret_key_fake_1111' ) );
 		$this->reload_payment_gateways();

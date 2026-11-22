@@ -579,6 +579,17 @@ class KhaltiGateway extends WC_Payment_Gateway {
 	}
 
 	/**
+	 * Whether the order has a pidx started in live mode while the site is in test mode: real
+	 * money that cannot be checked from here, so the order must not be auto-cancelled. (Test
+	 * pidx values seen from live mode are never real money and do not hold the order.)
+	 *
+	 * @param WC_Order $order Order.
+	 */
+	public function holds_unverifiable_payment( WC_Order $order ): bool {
+		return $this->is_test_mode() && in_array( self::MODE_LIVE, $this->other_mode_pidxs( $order ), true );
+	}
+
+	/**
 	 * Notes pidx values started in the other mode, once each, under the lock (no wait).
 	 *
 	 * @param WC_Order $order Order (fresh).

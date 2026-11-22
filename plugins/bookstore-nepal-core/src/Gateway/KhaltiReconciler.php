@@ -89,7 +89,12 @@ class KhaltiReconciler {
 			KhaltiGateway::RECONCILE_RETRY,
 			KhaltiGateway::RECONCILE_MISMATCH,
 		);
-		return in_array( $result['outcome'], $keep, true ) ? false : $cancel;
+		if ( in_array( $result['outcome'], $keep, true ) ) {
+			return false;
+		}
+		// A live payment attempt cannot be checked while the shop is in test mode: hold the order
+		// for staff (reconcile() has added the note saying which dashboard to check).
+		return $gateway->holds_unverifiable_payment( $order ) ? false : $cancel;
 	}
 
 	/**

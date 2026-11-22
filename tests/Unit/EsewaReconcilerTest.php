@@ -820,6 +820,46 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		$this->assertSame( array(), $this->requested );
 	}
 
+	public function test_uuid_mode_is_recorded_without_changing_the_uuid_list(): void {
+		$order = $this->order();
+		$uuid  = $this->uuid( $order );
+		$this->assertSame( array( $uuid => '500' ), $order->get_meta( EsewaGateway::META_UUIDS ), 'List shape unchanged.' );
+		$this->assertSame( array( $uuid => 'test' ), $order->get_meta( EsewaGateway::META_UUID_MODES ) );
+	}
+
+	public function test_live_uuid_while_in_test_mode_holds_the_order_and_is_noted_once(): void {
+		// A real (live) payment attempt; the owner then switches the shop to test mode.
+		update_option( 'woocommerce_esewa_settings', array( 'enabled' => 'yes', 'testmode' => 'no', 'product_code' => 'LIVECODE', 'secret_key' => 'live-secret-fake' ) );
+		$this->reload_payment_gateways();
+		$this->gateway = new EsewaGateway();
+		$order         = $this->order( 90 );
+		$uuid          = $this->uuid( $order );
+		$this->assertSame( array( $uuid => 'live' ), $order->get_meta( EsewaGateway::META_UUID_MODES ) );
+		$this->statuses[ $uuid ] = 'NOT_FOUND'; // What the sandbox would say.
+		update_option( 'woocommerce_esewa_settings', array( 'enabled' => 'yes', 'testmode' => 'yes', 'product_code' => 'LIVECODE', 'secret_key' => 'live-secret-fake' ) );
+		$this->reload_payment_gateways();
+
+		$this->assertFalse( $this->should_cancel( $order ), 'Real money that cannot be checked from test mode: hold.' );
+		EsewaReconciler::run();
+		EsewaReconciler::run();
+
+		$order = $this->fresh( $order );
+		$this->assertSame( array(), $this->requested, 'A live UUID is never checked against the sandbox.' );
+		$this->assertFalse( $order->is_paid() );
+		$this->assertSame( 'pending', $order->get_status() );
+		$this->assertSame( 1, $this->count_notes_containing( $order, 'eSewa payment started in live mode — check the live merchant portal' ) );
+		$this->assertFalse( $this->should_cancel( $order ), 'Still held on later passes.' );
+	}
+
+	public function test_uuid_without_a_recorded_mode_keeps_being_checked_in_test_mode(): void {
+		$order = $this->order( 90 );
+		$order->delete_meta_data( EsewaGateway::META_UUID_MODES );
+		$order->save();
+		$this->statuses[ $this->uuid( $order ) ] = 'NOT_FOUND';
+		$this->assertTrue( $this->should_cancel( $this->fresh( $order ) ) );
+		$this->assertSame( array( $this->uuid( $order ) ), $this->requested );
+	}
+
 	public function test_amount_mismatch_note_tells_staff_to_refund_or_reconcile(): void {
 		$order = $this->order();
 		$this->statuses[ $this->uuid( $order ) ] = array(

@@ -87,7 +87,12 @@ class EsewaReconciler {
 			EsewaGateway::RECONCILE_RETRY,
 			EsewaGateway::RECONCILE_MISMATCH,
 		);
-		return in_array( $result['outcome'], $keep, true ) ? false : $cancel;
+		if ( in_array( $result['outcome'], $keep, true ) ) {
+			return false;
+		}
+		// A live payment attempt cannot be checked while the shop is in test mode: hold the order
+		// for staff (reconcile() has added the note saying to check the live merchant portal).
+		return $gateway->holds_unverifiable_payment( $order ) ? false : $cancel;
 	}
 
 	/**

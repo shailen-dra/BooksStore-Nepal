@@ -40,6 +40,11 @@ class EsewaGateway extends WC_Payment_Gateway {
 	public const META_STRAY_CHECK  = '_bsn_esewa_stray_check';
 	// Set once an order has more than one transaction, for the second-payment check.
 	public const META_MULTIPLE     = '_bsn_esewa_multiple';
+	// uuid => test|live: the mode each UUID was minted in (kept beside META_UUIDS, whose shape is
+	// unchanged). UUIDs minted before this was recorded have no entry.
+	public const META_UUID_MODES = '_bsn_esewa_uuid_modes';
+	// uuid => time for live UUIDs noted as uncheckable from test mode (one note each).
+	public const META_MODE_NOTES = '_bsn_esewa_mode_notes';
 	public const TEST_PRODUCT_CODE = 'EPAYTEST';
 	// Public UAT secret published in eSewa's developer docs. Live secret lives in settings only.
 	public const TEST_SECRET     = '8gBm/:&EnhH.1/q';
@@ -284,8 +289,13 @@ class EsewaGateway extends WC_Payment_Gateway {
 		unset( $remembered[ $uuid ] ); // Same second: move it to the end.
 		$remembered[ $uuid ] = $this->order_amount( $order );
 		$remembered          = array_slice( $remembered, -self::MAX_REMEMBERED_UUIDS, null, true );
+		$modes = $order->get_meta( self::META_UUID_MODES );
+		$modes = is_array( $modes ) ? $modes : array();
+		unset( $modes[ $uuid ] );
+		$modes[ $uuid ] = $this->is_test_mode() ? 'test' : 'live';
 		$order->update_meta_data( self::META_UUID, $uuid );
 		$order->update_meta_data( self::META_UUIDS, $remembered );
+		$order->update_meta_data( self::META_UUID_MODES, array_intersect_key( $modes, $remembered ) );
 		if ( count( $remembered ) > 1 ) {
 			$order->update_meta_data( self::META_MULTIPLE, '1' );
 		}
@@ -312,6 +322,84 @@ class EsewaGateway extends WC_Payment_Gateway {
 			$remembered[ $current ] = $this->order_amount( $order );
 		}
 		return $remembered;
+	}
+
+	/**
+	 * In test mode, the order's UUIDs minted in live mode: real payments that eSewa's sandbox
+	 * cannot answer for, so they are not checked from here. Empty in live mode (a test UUID seen
+	 * from live mode is never real money and is checked as before).
+	 *
+	 * @param WC_Order $order Order.
+	 * @return array<string,true>
+	 */
+	private function unverifiable_live_uuids( WC_Order $order ): array {
+		if ( ! $this->is_test_mode() ) {
+			return array();
+		}
+		$modes = $order->get_meta( self::META_UUID_MODES );
+		$out   = array();
+		foreach ( array_keys( $this->remembered_uuids( $order ) ) as $uuid ) {
+			if ( is_array( $modes ) && 'live' === ( $modes[ $uuid ] ?? '' ) ) {
+				$out[ (string) $uuid ] = true;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Whether the order has a live UUID while the site is in test mode, so it must not be
+	 * auto-cancelled.
+	 *
+	 * @param WC_Order $order Order.
+	 */
+	public function holds_unverifiable_payment( WC_Order $order ): bool {
+		return (bool) $this->unverifiable_live_uuids( $order );
+	}
+
+	/**
+	 * Adds one note per live UUID that cannot be checked from test mode, under the lock (no
+	 * wait). Takes no lock when there is nothing new to note.
+	 *
+	 * @param WC_Order $order Order (fresh).
+	 */
+	private function maybe_note_live_uuids( WC_Order $order ): void {
+		$noted = $order->get_meta( self::META_MODE_NOTES );
+		if ( ! array_diff_key( $this->unverifiable_live_uuids( $order ), is_array( $noted ) ? $noted : array() ) ) {
+			return;
+		}
+		$lock = $this->lock( $order->get_id(), 0 );
+		if ( null === $lock ) {
+			return;
+		}
+		try {
+			$order = $this->reload_order( $order->get_id() );
+			if ( null === $order ) {
+				return;
+			}
+			$noted = $order->get_meta( self::META_MODE_NOTES );
+			$noted = is_array( $noted ) ? $noted : array();
+			$added = false;
+			foreach ( array_keys( $this->unverifiable_live_uuids( $order ) ) as $uuid ) {
+				if ( isset( $noted[ $uuid ] ) ) {
+					continue;
+				}
+				$noted[ $uuid ] = gmdate( 'c' );
+				$added          = true;
+				$order->add_order_note(
+					sprintf(
+						/* translators: %s: eSewa transaction UUID. */
+						__( 'eSewa payment started in live mode — check the live merchant portal. Transaction UUID: %s. The site is now in test mode, so this payment is not checked automatically, and the order is not cancelled automatically.', 'bookstore-nepal' ),
+						$uuid
+					)
+				);
+			}
+			if ( $added ) {
+				$order->update_meta_data( self::META_MODE_NOTES, array_intersect_key( $noted, $this->remembered_uuids( $order ) ) );
+				$order->save();
+			}
+		} finally {
+			$this->unlock( $lock );
+		}
 	}
 
 	/**
@@ -834,6 +922,13 @@ class EsewaGateway extends WC_Payment_Gateway {
 		if ( null === $order || '' === $this->product_code() ) {
 			return $result;
 		}
+		if ( $this->unverifiable_live_uuids( $order ) ) {
+			$this->maybe_note_live_uuids( $order );
+			$order = $this->reload_order( $order_id );
+			if ( null === $order ) {
+				return $result;
+			}
+		}
 		if ( self::ID !== $order->get_payment_method() ) {
 			$extra              = $this->check_unexpected_payments( $order, false );
 			$result['outcome']  = $extra['found'] ? self::RECONCILE_STRAY : self::RECONCILE_SKIPPED;
@@ -1103,10 +1198,11 @@ class EsewaGateway extends WC_Payment_Gateway {
 		}
 		$noted = $order->get_meta( self::META_STATUS_NOTES );
 		$noted = is_array( $noted ) ? $noted : array();
+		$live  = $this->unverifiable_live_uuids( $order );
 		$out   = array();
 		foreach ( $this->remembered_uuids( $order ) as $uuid => $amount ) {
 			$uuid = (string) $uuid;
-			if ( $uuid === $paid_uuid || ! empty( $noted[ $uuid ] ) || $order->get_meta( $this->verified_stray_key( $uuid ) ) ) {
+			if ( $uuid === $paid_uuid || isset( $live[ $uuid ] ) || ! empty( $noted[ $uuid ] ) || $order->get_meta( $this->verified_stray_key( $uuid ) ) ) {
 				continue;
 			}
 			$out[ $uuid ] = $amount;
@@ -1136,9 +1232,10 @@ class EsewaGateway extends WC_Payment_Gateway {
 	private function unchecked_uuids( WC_Order $order ): array {
 		$noted = $order->get_meta( self::META_STATUS_NOTES );
 		$noted = is_array( $noted ) ? $noted : array();
+		$live  = $this->unverifiable_live_uuids( $order );
 		$out   = array();
 		foreach ( $this->remembered_uuids( $order ) as $uuid => $amount ) {
-			if ( array_intersect( self::FINAL_STATUSES, array_keys( (array) ( $noted[ $uuid ] ?? array() ) ) ) ) {
+			if ( isset( $live[ $uuid ] ) || array_intersect( self::FINAL_STATUSES, array_keys( (array) ( $noted[ $uuid ] ?? array() ) ) ) ) {
 				continue;
 			}
 			$out[ $uuid ] = $amount;
