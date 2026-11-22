@@ -824,6 +824,12 @@ class EsewaGateway extends WC_Payment_Gateway {
 			$result['outcome'] = $is_esewa ? self::RECONCILE_UNPAID : self::RECONCILE_SKIPPED;
 			return $result;
 		}
+		$to_record = array_filter( $checks, static fn( $check ) => self::CHECK_RETRY !== $check['outcome'] );
+		if ( '' === $complete && ! $to_record ) {
+			// Only undecided answers or an API failure: nothing to write.
+			$result['outcome'] = self::RECONCILE_RETRY;
+			return $result;
+		}
 
 		// Don't wait: a request holding the lock (the callback) is deciding; the next run checks again.
 		$lock = $this->lock( $order_id, 0 );
