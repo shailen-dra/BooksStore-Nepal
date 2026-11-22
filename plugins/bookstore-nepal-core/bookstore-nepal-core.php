@@ -53,9 +53,11 @@ add_action( 'bsn_booted', array( \BookstoreNepal\Shipping::class, 'register' ) )
 add_action( 'before_woocommerce_init', array( \BookstoreNepal\Gateway\EsewaGateway::class, 'declare_compatibility' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\EsewaGateway::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\EsewaReconciler::class, 'register' ) );
+register_deactivation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Gateway\EsewaReconciler::class, 'unschedule' ) );
 // EsewaGateway::declare_compatibility() above declares HPOS and block checkout support for the whole plugin, Khalti included.
 add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\KhaltiGateway::class, 'register' ) );
-register_deactivation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Gateway\EsewaReconciler::class, 'unschedule' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\Gateway\KhaltiReconciler::class, 'register' ) );
+register_deactivation_hook( BSN_PLUGIN_FILE, array( \BookstoreNepal\Gateway\KhaltiReconciler::class, 'unschedule' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\OrderStatuses::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Cli\SetupCommand::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\GiftFinder::class, 'register' ) );
