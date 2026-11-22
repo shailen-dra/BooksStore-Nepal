@@ -472,6 +472,49 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 		$this->assertSame( 'pending', $this->fresh( $other )->get_status() );
 	}
 
+	public function test_signed_callback_for_an_earlier_attempt_completes_the_order(): void {
+		// First attempt: the customer pays, but the tab dies before the callback.
+		$order   = $this->order();
+		$earlier = $order->get_id() . '-1700000000';
+		$order->update_meta_data( EsewaGateway::META_UUID, $earlier );
+		$order->update_meta_data( EsewaGateway::META_UUIDS, array( $earlier => '500' ) );
+		$order->save();
+		$payload = $this->payload( $this->fresh( $order ) ); // Signed for the earlier UUID.
+		// They retry (new UUID), then eSewa's success redirect for the first attempt arrives.
+		$this->gateway->process_payment( $order->get_id() );
+		$order = $this->fresh( $order );
+		$this->assertNotSame( $earlier, $order->get_meta( EsewaGateway::META_UUID ) );
+		$this->status_api( 'COMPLETE', $earlier );
+
+		$redirect = $this->gateway->handle_callback( $this->success_query( $order, $payload ) );
+
+		$order = $this->fresh( $order );
+		$this->assertSame( $order->get_checkout_order_received_url(), $redirect );
+		$this->assertSame( 'processing', $order->get_status() );
+		$this->assertSame( '0LD5CEH', $order->get_transaction_id() );
+		$this->assertSame( $earlier, $order->get_meta( EsewaGateway::META_PAID_UUID ) );
+		$this->assertSame( 9, wc_get_product( $this->product->get_id() )->get_stock_quantity() );
+		$this->assertCount( 1, $this->requested );
+		$this->assertStringContainsString( 'transaction_uuid=' . $earlier, $this->requested[0] );
+		$this->assertStringContainsString( 'total_amount=500', $this->requested[0] );
+	}
+
+	public function test_callback_for_earlier_attempt_still_needs_status_api_and_amount(): void {
+		$order   = $this->order();
+		$earlier = $order->get_id() . '-1700000000';
+		$order->update_meta_data( EsewaGateway::META_UUIDS, array( $earlier => '500' ) + $this->gateway->remembered_uuids( $order ) );
+		$order->save();
+		$order = $this->fresh( $order );
+		$this->status_api( 'PENDING', $earlier );
+		$this->gateway->handle_callback( $this->success_query( $order, $this->payload( $order, array( 'transaction_uuid' => $earlier ) ) ) );
+		$this->assert_unpaid_with_note( $order, 'PENDING' );
+
+		wc_clear_notices();
+		$this->status_api( 'COMPLETE', $earlier );
+		$this->gateway->handle_callback( $this->success_query( $order, $this->payload( $order, array( 'transaction_uuid' => $earlier, 'total_amount' => '400.0' ) ) ) );
+		$this->assert_unpaid_with_note( $order, 'amount mismatch' );
+	}
+
 	public function test_wrong_order_key_rejected(): void {
 		$order        = $this->order();
 		$this->status_api( 'COMPLETE', $order->get_meta( EsewaGateway::META_UUID ) );

@@ -33,6 +33,8 @@ class EsewaGateway extends WC_Payment_Gateway {
 	// reconciler can find a payment made on an earlier attempt.
 	public const META_UUIDS        = '_bsn_esewa_uuids';
 	public const META_REF_ID       = '_bsn_esewa_ref_id';
+	// The transaction UUID that paid the order (any other paid one is a second payment).
+	public const META_PAID_UUID    = '_bsn_esewa_paid_uuid';
 	public const META_STRAY_PREFIX = '_bsn_esewa_stray_';
 	// uuid => [ status => time ] for statuses already noted by the reconciler (one note each).
 	public const META_STATUS_NOTES = '_bsn_esewa_status_notes';
@@ -470,6 +472,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 			}
 			$this->complete_payment(
 				$order,
+				$confirmed['uuid'],
 				$confirmed['transaction_code'],
 				$confirmed['ref_id'],
 				sprintf(
@@ -490,11 +493,13 @@ class EsewaGateway extends WC_Payment_Gateway {
 	 * it is unpaid, so payment_complete() (stock, emails) runs once per order.
 	 *
 	 * @param WC_Order $order          Order (fresh, unpaid, locked).
+	 * @param string   $uuid           Transaction UUID that paid it.
 	 * @param string   $transaction_id Transaction id to record.
 	 * @param string   $ref_id         eSewa reference id.
 	 * @param string   $note           Order note.
 	 */
-	private function complete_payment( WC_Order $order, string $transaction_id, string $ref_id, string $note ): void {
+	private function complete_payment( WC_Order $order, string $uuid, string $transaction_id, string $ref_id, string $note ): void {
+		$order->update_meta_data( self::META_PAID_UUID, $uuid );
 		$order->update_meta_data( self::META_REF_ID, $ref_id );
 		$order->add_order_note( $note );
 		$order->payment_complete( $transaction_id );
@@ -563,7 +568,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 	 *
 	 * @param WC_Order $order Order (unpaid).
 	 * @param string   $data  Base64 JSON from eSewa.
-	 * @return array{transaction_code:string,ref_id:string}|string
+	 * @return array{uuid:string,transaction_code:string,ref_id:string}|string
 	 */
 	private function verify_success( WC_Order $order, string $data ) {
 		// "+" in base64 arrives as a space when the value was not URL-encoded.
@@ -582,8 +587,10 @@ class EsewaGateway extends WC_Payment_Gateway {
 		if ( (string) $payload['product_code'] !== $this->product_code() ) {
 			return __( 'eSewa callback rejected: product code does not match this store.', 'bookstore-nepal' );
 		}
-		$uuid = (string) $order->get_meta( self::META_UUID );
-		if ( '' === $uuid || ! hash_equals( $uuid, (string) $payload['transaction_uuid'] ) ) {
+		// Any attempt started for this order counts: the customer may have paid an earlier one,
+		// lost the tab and retried before eSewa's redirect for the first came through.
+		$uuid = $this->remembered_uuid_matching( $order, (string) $payload['transaction_uuid'] );
+		if ( '' === $uuid ) {
 			return __( 'eSewa callback rejected: transaction does not belong to this order.', 'bookstore-nepal' );
 		}
 		if ( ! $this->amounts_match( $payload['total_amount'], $order ) ) {
@@ -611,9 +618,27 @@ class EsewaGateway extends WC_Payment_Gateway {
 			return $status;
 		}
 		return array(
+			'uuid'             => $uuid,
 			'transaction_code' => $transaction_code,
 			'ref_id'           => $status['ref_id'],
 		);
+	}
+
+	/**
+	 * The remembered UUID of this order equal to $candidate (compared in constant time), or ''.
+	 *
+	 * @param WC_Order $order     Order.
+	 * @param string   $candidate UUID from eSewa.
+	 */
+	private function remembered_uuid_matching( WC_Order $order, string $candidate ): string {
+		$found = '';
+		foreach ( array_keys( $this->remembered_uuids( $order ) ) as $uuid ) {
+			$uuid = (string) $uuid;
+			if ( '' !== $candidate && hash_equals( $uuid, $candidate ) ) {
+				$found = $uuid;
+			}
+		}
+		return $found;
 	}
 
 	/**
@@ -885,6 +910,7 @@ class EsewaGateway extends WC_Payment_Gateway {
 			}
 			$this->complete_payment(
 				$order,
+				$complete,
 				$check['ref_id'],
 				$check['ref_id'],
 				sprintf(
