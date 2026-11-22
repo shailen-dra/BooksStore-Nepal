@@ -238,6 +238,33 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 		$this->assertContains( 'We’re still confirming your eSewa payment. Please refresh this page in a moment, or contact us if it does not update.', $notices );
 	}
 
+	public function test_lock_held_on_failure_return_tells_customer_we_are_checking(): void {
+		$order = $this->order();
+		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+		$other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_esewa_' . $order->get_id() ) );
+		add_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
+		$log      = wp_tempnam( 'bsn-esewa-log' );
+		$previous = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet
+		try {
+			$this->gateway->handle_callback(
+				array(
+					'result'   => 'failure',
+					'order_id' => (string) $order->get_id(),
+					'key'      => $order->get_order_key(),
+				)
+			);
+		} finally {
+			ini_set( 'error_log', (string) $previous ); // phpcs:ignore WordPress.PHP.IniSet
+			unlink( $log );
+			remove_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
+			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_esewa_' . $order->get_id() ) );
+			$other->close();
+		}
+		$notices = wp_list_pluck( wc_get_notices( 'notice' ), 'notice' );
+		$this->assertContains( 'We’re still checking this order with eSewa. Please refresh this page in a moment, or contact us if it does not update.', $notices );
+		$this->assertNotContains( 'We’re still confirming your eSewa payment. Please refresh this page in a moment, or contact us if it does not update.', $notices );
+	}
+
 	private function notes( WC_Order $order ): string {
 		return implode( "\n", wp_list_pluck( wc_get_order_notes( array( 'order_id' => $order->get_id() ) ), 'content' ) );
 	}
