@@ -172,4 +172,79 @@ class StorePagesTest extends WP_UnitTestCase {
 		( new SetupCommand() )->run( array( 'whatsapp' => '' ) );
 		$this->assertSame( '', get_option( 'bsn_shop_whatsapp' ) );
 	}
+
+	public function test_trashed_page_is_recreated_with_the_clean_slug(): void {
+		StorePages::ensure_all();
+		$old = $this->page_id( 'about' );
+		wp_trash_post( $old );
+		StorePages::ensure_all();
+		$new = $this->page_id( 'about' );
+		$this->assertNotSame( $old, $new );
+		$this->assertSame( 'about', get_post_field( 'post_name', $new ) );
+	}
+
+	public function test_option_pointing_at_a_deleted_post_is_recreated(): void {
+		StorePages::ensure_all();
+		$old = $this->page_id( 'faq' );
+		wp_delete_post( $old, true );
+		$this->assertSame( StorePages::CREATED, StorePages::ensure_all()['faq'] );
+		$this->assertNotSame( $old, $this->page_id( 'faq' ) );
+		$this->assertSame( 'publish', get_post_status( $this->page_id( 'faq' ) ) );
+	}
+
+	public function test_private_pending_and_future_pages_are_kept(): void {
+		foreach ( array( 'private', 'pending', 'future' ) as $status ) {
+			$args = array( 'post_type' => 'page', 'post_status' => $status, 'post_title' => 'Mine ' . $status, 'post_content' => 'Owner ' . $status );
+			if ( 'future' === $status ) {
+				$args['post_date'] = gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS * 30 );
+			}
+			$id = self::factory()->post->create( $args );
+			global $wpdb;
+			$wpdb->update( $wpdb->posts, array( 'post_modified' => get_post_field( 'post_date', $id ) ), array( 'ID' => $id ) );
+			clean_post_cache( $id );
+			update_option( 'bsn_page_about', $id );
+			$this->assertStringStartsWith( StorePages::KEPT, StorePages::ensure_all()['about'], $status );
+			$this->assertSame( $status, get_post_status( $id ), $status );
+			$this->assertSame( 'Owner ' . $status, get_post_field( 'post_content', $id ), $status );
+		}
+	}
+
+	public function test_existing_published_page_with_the_slug_is_adopted_not_duplicated(): void {
+		$id = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_name' => 'about', 'post_title' => 'About', 'post_content' => 'Owner text.' ) );
+		$this->assertStringStartsWith( StorePages::KEPT, StorePages::ensure_all()['about'] );
+		$this->assertSame( $id, $this->page_id( 'about' ) );
+		$this->assertSame( 'Owner text.', get_post_field( 'post_content', $id ) );
+		$this->assertNull( get_page_by_path( 'about-2', OBJECT, 'page' ) );
+	}
+
+	public function test_existing_edited_draft_with_the_slug_is_adopted_and_left_alone(): void {
+		$id = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'draft', 'post_name' => 'contact', 'post_content' => 'Owner draft.' ) );
+		global $wpdb;
+		$wpdb->update( $wpdb->posts, array( 'post_modified' => '2030-01-01 00:00:00' ), array( 'ID' => $id ) );
+		clean_post_cache( $id );
+		$this->assertStringStartsWith( StorePages::KEPT, StorePages::ensure_all()['contact'] );
+		$this->assertSame( $id, $this->page_id( 'contact' ) );
+		$this->assertSame( 'draft', get_post_status( $id ) );
+		$this->assertSame( 'Owner draft.', get_post_field( 'post_content', $id ) );
+		$this->assertNull( get_page_by_path( 'contact-2', OBJECT, 'page' ) );
+	}
+
+	public function test_existing_untouched_draft_with_the_slug_is_adopted_and_filled(): void {
+		$id = $this->default_draft( 'Delivery', 'delivery' );
+		$this->assertSame( StorePages::FILLED, StorePages::ensure_all()['delivery'] );
+		$this->assertSame( $id, $this->page_id( 'delivery' ) );
+		$this->assertSame( 'publish', get_post_status( $id ) );
+	}
+
+	public function test_stored_content_is_the_pattern_block_when_the_theme_pattern_exists(): void {
+		register_block_pattern( 'bookstore-nepal/page-faq', array( 'title' => 'FAQ', 'content' => '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->' ) );
+		try {
+			( new SetupCommand() )->run( array() );
+			$this->assertSame( '<!-- wp:pattern {"slug":"bookstore-nepal/page-faq"} /-->', get_post_field( 'post_content', $this->page_id( 'faq' ) ) );
+			$this->assertTrue( StorePages::pattern_available() );
+		} finally {
+			unregister_block_pattern( 'bookstore-nepal/page-faq' );
+		}
+		$this->assertFalse( StorePages::pattern_available() );
+	}
 }

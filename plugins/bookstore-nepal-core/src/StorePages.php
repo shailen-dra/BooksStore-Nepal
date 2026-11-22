@@ -90,9 +90,20 @@ class StorePages {
 	private static function ensure( string $key, array $def ): string {
 		$id   = (int) get_option( $def['option'] );
 		$post = $id ? get_post( $id ) : null;
+		if ( ! ( $post instanceof \WP_Post ) || 'page' !== $post->post_type || 'trash' === $post->post_status ) {
+			// The option is empty, points at a deleted or trashed page: adopt a page that already holds the
+			// slug (the owner may have made one) rather than create "about-2" beside it.
+			$post = get_page_by_path( $def['slug'], OBJECT, 'page' );
+			if ( ! ( $post instanceof \WP_Post ) || 'trash' === $post->post_status ) {
+				$post = null;
+			}
+		}
 
-		if ( $post instanceof \WP_Post && 'page' === $post->post_type && 'trash' !== $post->post_status ) {
-			if ( 'publish' === $post->post_status ) {
+		if ( null !== $post ) {
+			update_option( $def['option'], (int) $post->ID );
+			// Only a draft nobody has edited is ours to fill; published, private, pending, scheduled
+			// and edited pages are the owner's.
+			if ( 'draft' !== $post->post_status ) {
 				return self::KEPT;
 			}
 			if ( ! self::untouched( $post ) ) {
@@ -135,6 +146,13 @@ class StorePages {
 	 */
 	private static function untouched( \WP_Post $post ): bool {
 		return $post->post_modified === $post->post_date;
+	}
+
+	/**
+	 * Whether the theme's page patterns are registered (the Bookstore Nepal theme is active).
+	 */
+	public static function pattern_available(): bool {
+		return \WP_Block_Patterns_Registry::get_instance()->is_registered( 'bookstore-nepal/page-faq' );
 	}
 
 	/**

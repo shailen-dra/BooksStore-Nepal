@@ -73,10 +73,10 @@ class SetupCommand {
 	 * : Shop phone number shown on the Contact page and in the footer. Set only when given; an empty value clears it.
 	 *
 	 * [--whatsapp=<number>]
-	 * : WhatsApp number, digits with the country code (e.g. 97798XXXXXXXX). Set only when given.
+	 * : WhatsApp number: a Nepali mobile, e.g. 9812345678 or 9779812345678. Set only when given.
 	 *
 	 * [--email=<address>]
-	 * : Contact email shown to customers. Set only when given; an empty value goes back to the site admin email.
+	 * : Contact email shown to customers. Set only when given; an empty value clears it (the footer then shows a placeholder).
 	 *
 	 * @param array $args       Positional arguments (unused).
 	 * @param array $assoc_args Flags.
@@ -88,6 +88,9 @@ class SetupCommand {
 		}
 		foreach ( $this->page_report as $key => $outcome ) {
 			\WP_CLI::log( sprintf( 'Page %s: %s', $key, $outcome ) );
+		}
+		if ( $this->page_report && ! StorePages::pattern_available() ) {
+			\WP_CLI::warning( 'The Bookstore Nepal theme is not active, so the store information pages got a short placeholder paragraph instead of their text. Activate the theme, then delete those pages (or their stored IDs) and run setup again, or write the text in the page editor.' );
 		}
 		foreach ( $errors as $error ) {
 			\WP_CLI::warning( $error );
