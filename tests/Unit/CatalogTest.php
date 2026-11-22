@@ -160,6 +160,75 @@ class CatalogTest extends WP_UnitTestCase {
 		$this->assertSame( '', $this->render_for( $product ) );
 	}
 
+	private function book_by( string $title, string $author, string $type = 'product' ): int {
+		if ( 'product' !== $type ) {
+			$id = self::factory()->post->create( array( 'post_title' => $title, 'post_type' => $type ) );
+			update_post_meta( $id, Catalog::META_AUTHOR, $author );
+			return $id;
+		}
+		$product = new WC_Product_Simple();
+		$product->set_name( $title );
+		$product->set_status( 'publish' );
+		$product->update_meta_data( Catalog::META_AUTHOR, $author );
+		return $product->save();
+	}
+
+	private function search_ids( string $term, $post_type = 'product' ): array {
+		$query = new WP_Query(
+			array(
+				'post_type'      => $post_type,
+				's'              => $term,
+				'fields'         => 'ids',
+				'posts_per_page' => -1,
+			)
+		);
+		return array_map( 'intval', $query->posts );
+	}
+
+	public function test_product_search_matches_devanagari_author(): void {
+		$id    = $this->book_by( 'मुनामदन', 'लक्ष्मीप्रसाद देवकोटा' );
+		$other = $this->book_by( 'Other book', 'Someone Else' );
+		$found = $this->search_ids( 'देवकोटा' );
+		$this->assertContains( $id, $found );
+		$this->assertNotContains( $other, $found );
+	}
+
+	public function test_product_search_matches_partial_and_full_author_name(): void {
+		$id = $this->book_by( 'Mountain Tales', 'Aarav Sharma' );
+		$this->assertContains( $id, $this->search_ids( 'Aarav Sharma' ) );
+		$this->assertContains( $id, $this->search_ids( 'Sharma' ) );
+		$this->assertContains( $id, $this->search_ids( 'aarav' ), 'Case-insensitive partial match.' );
+		$this->assertContains( $id, wc_get_products( array( 's' => 'Sharma', 'return' => 'ids' ) ) );
+	}
+
+	public function test_product_search_still_matches_title_and_not_unrelated_authors(): void {
+		$id = $this->book_by( 'Mountain Tales', 'Aarav Sharma' );
+		$this->assertContains( $id, $this->search_ids( 'Mountain' ) );
+		$this->assertSame( array(), $this->search_ids( 'Mira Rai' ) );
+	}
+
+	public function test_author_search_escapes_like_wildcards_and_quotes(): void {
+		$id = $this->book_by( 'Irish Tales', "Siobhan O'Brien" );
+		$this->assertContains( $id, $this->search_ids( "O'Brien" ) );
+		$this->assertNotContains( $id, $this->search_ids( 'O_Brien' ), 'Underscore is literal, not a wildcard.' );
+		$this->assertNotContains( $id, $this->search_ids( 'Siobhan%Brien' ), 'Percent is literal, not a wildcard.' );
+	}
+
+	public function test_author_search_only_applies_to_product_queries(): void {
+		$post_id = $this->book_by( 'A blog post', 'Mira Rai', 'post' );
+		$this->assertNotContains( $post_id, $this->search_ids( 'Mira Rai', 'post' ) );
+	}
+
+	public function test_author_search_not_applied_in_admin(): void {
+		$id = $this->book_by( 'Mountain Tales', 'Mira Rai' );
+		set_current_screen( 'edit-product' );
+		try {
+			$this->assertNotContains( $id, $this->search_ids( 'Mira Rai' ) );
+		} finally {
+			set_current_screen( 'front' );
+		}
+	}
+
 	public function test_render_details_escapes_author(): void {
 		$product = new WC_Product_Simple();
 		$product->set_name( 'X' );

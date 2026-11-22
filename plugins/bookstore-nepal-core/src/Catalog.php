@@ -54,6 +54,47 @@ class Catalog {
 		add_action( 'woocommerce_product_options_general_product_data', array( self::class, 'render_fields' ) );
 		add_action( 'woocommerce_process_product_meta', array( self::class, 'save_fields' ) );
 		add_action( 'woocommerce_single_product_summary', array( self::class, 'render_details' ), 25 );
+		add_filter( 'posts_search', array( self::class, 'search_author' ), 10, 2 );
+	}
+
+	/**
+	 * Lets front-end product searches match the author field as well as title and description.
+	 *
+	 * The whole search phrase is matched against the author, so "Devkota" finds
+	 * "Laxmi Prasad Devkota" and "Mira Rai" finds "Mira Rai".
+	 *
+	 * @param string    $search Search SQL from WP_Query (starts with " AND (").
+	 * @param \WP_Query $query  The query.
+	 * @return string
+	 */
+	public static function search_author( $search, $query ): string {
+		$search = (string) $search;
+		if ( '' === $search || ! $query instanceof \WP_Query || ( is_admin() && ! wp_doing_ajax() ) ) {
+			return $search;
+		}
+		if ( ! in_array( 'product', (array) $query->get( 'post_type' ), true ) ) {
+			return $search;
+		}
+		$phrase = trim( (string) $query->get( 's' ) );
+		if ( '' === $phrase ) {
+			return $search;
+		}
+		global $wpdb;
+		$exists = $wpdb->prepare(
+			"EXISTS ( SELECT 1 FROM {$wpdb->postmeta} bsn_author WHERE bsn_author.post_id = {$wpdb->posts}.ID AND bsn_author.meta_key = %s AND bsn_author.meta_value LIKE %s ) OR ",
+			self::META_AUTHOR,
+			'%' . $wpdb->esc_like( $phrase ) . '%'
+		);
+		// WP_Query wraps the term clauses as " AND ( ... ) "; OR the author check into that group.
+		$result = preg_replace_callback(
+			'/^\s*AND\s*\(/',
+			static function () use ( $exists ): string {
+				return ' AND ( ' . $exists;
+			},
+			$search,
+			1
+		);
+		return null === $result ? $search : $result;
 	}
 
 	/**
