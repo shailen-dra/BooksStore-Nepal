@@ -1,6 +1,6 @@
 # BooksStore-Nepal
 
-Online children's bookstore for Nepal, built on WordPress + WooCommerce. Customers browse books by age group, language and type, and pay with **eSewa**, **Khalti** or **cash on delivery**, with delivery anywhere in Nepal. The shop owner manages books, prices, stock and orders from wp-admin.
+Online children's bookstore for Nepal, built on WordPress + WooCommerce. Customers browse books by age group, language and type, and pay with **eSewa** or **cash on delivery** (**Khalti** is planned; see "Payments" below), with delivery anywhere in Nepal. The shop owner manages books, prices, stock and orders from wp-admin.
 
 ## Documents
 
@@ -8,6 +8,8 @@ Online children's bookstore for Nepal, built on WordPress + WooCommerce. Custome
 | --- | --- |
 | [docs/client-proposal.md](docs/client-proposal.md) | Client-facing proposal: features, payments, delivery, platform choice, costs |
 | [docs/superpowers/plans/2026-11-19-woocommerce-bookstore.md](docs/superpowers/plans/2026-11-19-woocommerce-bookstore.md) | Developer build plan, task by task |
+| [docs/admin-guide.md](docs/admin-guide.md) | Shop owner's guide to wp-admin: books, stock, orders, payments, delivery |
+| [docs/deployment.md](docs/deployment.md) | Going live: hosting, install, `wp bsn setup`, payment keys, launch checks, maintenance |
 
 ## What's in this repo
 
@@ -68,17 +70,19 @@ bash bin/seed-sample-books.sh   # optional: 12 sample books
 
 # 3. Tests
 composer install
+# Known issue: the script first checks raw.githubusercontent.com for a newer version and hangs retrying
+# where that host is unreachable. Prefix it with WP_INSTALL_TESTS_SKIP_UPDATE_CHECK=true to skip the check.
 bash bin/install-wp-tests.sh wp_tests bookstore bookstore 127.0.0.1 latest true
 vendor/bin/phpunit
-# Optional env: WP_TESTS_DIR (default: system temp dir/wordpress-tests-lib), WC_PLUGIN_DIR (default: the Herd site's WooCommerce)
+# Optional env: WP_TESTS_DIR (default: <repo>/.wp-tests-lib, git-ignored; WordPress core for the tests goes in <repo>/.wp-tests-wordpress), WC_PLUGIN_DIR (default: the Herd site's WooCommerce)
 ```
 
-> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. `wp bsn setup` leaves existing shipping rates alone; pass `--valley=<npr> --rest=<npr> --free-over=<npr>` to change them. Placeholder contact details (phone, WhatsApp, address) live in the theme footer: Appearance › Editor › Patterns › Footer. WooCommerce's "coming soon" mode hides store pages from visitors until you launch (WooCommerce › Settings › Site visibility).
+> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. `wp bsn setup` leaves existing shipping rates alone; pass `--valley=<npr> --rest=<npr> --free-over=<npr>` to change them. Store defaults the owner can change (cash on delivery, stock alerts, guest checkout, decimals, required phone, Nepal-only countries) are applied on the first run only; `wp option delete bsn_setup_done` makes the next run apply them again. Placeholder contact details (phone, WhatsApp, address) live in the theme footer: Appearance › Editor › Patterns › Footer. WooCommerce's "coming soon" mode hides store pages from visitors until you launch (WooCommerce › Settings › Site visibility).
 
 ## Payments: test mode
 
 - **eSewa:** WooCommerce → Settings → Payments → eSewa. Test mode uses product code `EPAYTEST` and eSewa's public test secret. Live keys come from the client's eSewa merchant account.
-- **Khalti:** plugin slug `integrate-khalti-in-wc-store` ("Integrate Khalti in WC Store", wordpress.org account `khaltiwp`, built by ACT360, linked from khalti.com). Install with `wp plugin install integrate-khalti-in-wc-store --activate`, then enter sandbox keys from the Khalti merchant dashboard in WooCommerce -> Settings -> Payments -> Khalti. **Known limitation:** this plugin has no WooCommerce Blocks integration, so it does not render in the block checkout, which this site uses. It ships enabled by default, so keep it disabled until keys and a block-checkout decision are in place.
+- **Khalti:** plugin slug `integrate-khalti-in-wc-store` ("Integrate Khalti in WC Store", wordpress.org account `khaltiwp`, built by ACT360, linked from khalti.com). Install it with `wp plugin install integrate-khalti-in-wc-store` and leave it **inactive** (see "Khalti status" in [docs/deployment.md](docs/deployment.md)). **Known limitation:** this plugin has no WooCommerce Blocks integration, so it does not render in the block checkout, which this site uses. It ships enabled by default once activated. To try it in sandbox, activate it, enter sandbox keys from the Khalti merchant dashboard in WooCommerce -> Settings -> Payments -> Khalti, and switch it off again afterwards. The storefront only mentions Khalti while its gateway is enabled.
 - Never commit payment keys. They live only in each site's wp-admin settings.
 
 ## Open items from the client

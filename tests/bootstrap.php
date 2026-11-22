@@ -2,14 +2,15 @@
 /**
  * PHPUnit bootstrap: WordPress test suite + WooCommerce + our plugin.
  *
- * Env overrides: WP_TESTS_DIR, WC_PLUGIN_DIR.
+ * Env overrides: WP_TESTS_DIR (default: <repo>/.wp-tests-lib), WC_PLUGIN_DIR.
  *
  * @package BookstoreNepal
  */
 
 $bsn_tests_dir = getenv( 'WP_TESTS_DIR' );
 if ( ! $bsn_tests_dir ) {
-	$bsn_tests_dir = rtrim( sys_get_temp_dir(), '/\\' ) . '/wordpress-tests-lib';
+	// Durable, git-ignored default (see bin/install-wp-tests.sh); the system temp dir is purged on reboot.
+	$bsn_tests_dir = dirname( __DIR__ ) . '/.wp-tests-lib';
 }
 
 $bsn_polyfills = dirname( __DIR__ ) . '/vendor/yoast/phpunit-polyfills';
