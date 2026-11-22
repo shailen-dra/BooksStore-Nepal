@@ -471,11 +471,11 @@ final class Theme {
 		if ( ! $previous instanceof \WC_Product ) {
 			$GLOBALS['product'] = wc_get_product( get_the_ID() ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 		}
+		ob_start();
 		try {
-			ob_start();
 			\BookstoreNepal\Catalog::render_details();
-			$details = trim( (string) ob_get_clean() );
 		} finally {
+			$details = trim( (string) ob_get_clean() );
 			if ( $had_product ) {
 				$GLOBALS['product'] = $previous; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
 			} else {
