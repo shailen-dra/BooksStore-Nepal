@@ -3,7 +3,7 @@ Theme Name: Bookstore Nepal
 Description: Storefront for a children's bookstore in Nepal. Child theme of Twenty Twenty-Five; WooCommerce block templates, age and language browsing, gift finder.
 Author: Bookstore Nepal
 Template: twentytwentyfive
-Version: 0.1.3
+Version: 0.1.7
 Requires at least: 6.6
 Requires PHP: 8.1
 License: GNU General Public License v2 or later
@@ -89,6 +89,21 @@ body {
 	align-items: center;
 	min-height: var(--bsn-tap);
 	font-weight: 700;
+}
+
+/* Focus: indicators for keyboard users only; text fields keep the browser's own focus handling */
+:where(a, button, summary, [role="button"], [tabindex]):focus-visible {
+	outline: 3px solid var(--wp--preset--color--accent-2);
+	outline-offset: 2px;
+}
+:where(a, button, summary, [role="button"], [tabindex]):focus:not(:focus-visible) {
+	outline: none;
+}
+.wc-block-components-button:not(.is-link):focus:not(:focus-visible),
+.wp-block-navigation-item__content:focus:not(:focus-visible),
+.wp-block-navigation-submenu__toggle:focus:not(:focus-visible) {
+	outline: none;
+	box-shadow: none;
 }
 
 /* Header */
@@ -673,6 +688,72 @@ body {
 	.bsn-filters__label { flex: 1 1 100%; }
 	.bsn-gift-finder p, .bsn-gift-finder p:last-child { flex: 1 1 100%; }
 	.bsn-gift-finder button { width: 100%; }
+}
+
+/* Sliders: New arrivals and Best sellers scroll sideways; only the row scrolls, never the page */
+.bsn-section__tools { gap: 4px 16px; }
+.bsn-slider-controls { display: flex; gap: 8px; }
+.bsn-slider-controls[hidden], .bsn-slider-btn[hidden] { display: none; }
+.bsn-slider-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--bsn-tap);
+	height: var(--bsn-tap);
+	padding: 0;
+	border: 2px solid var(--wp--custom--color--line);
+	border-radius: 999px;
+	background: var(--wp--custom--color--white);
+	color: var(--wp--preset--color--contrast);
+	cursor: pointer;
+}
+.bsn-slider-btn:hover:not(:disabled) { border-color: var(--wp--preset--color--contrast); }
+.bsn-slider-btn:focus-visible { outline: 3px solid var(--wp--preset--color--contrast); outline-offset: 2px; }
+.bsn-slider-btn:disabled { opacity: 0.4; cursor: default; }
+
+.bsn-slider {
+	--bsn-slider-gap: 12px;
+	--bsn-slider-cards: 2.2;
+	max-width: 100%;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scroll-snap-type: x mandatory;
+	scrollbar-width: thin;
+	-webkit-overflow-scrolling: touch;
+}
+.bsn-slider:focus-visible { outline: 3px solid var(--wp--preset--color--contrast); outline-offset: -3px; }
+.bsn-slider .wc-block-product-template {
+	display: flex !important;
+	flex-wrap: nowrap !important;
+	grid-template-columns: none !important;
+	gap: var(--bsn-slider-gap) !important;
+	margin: 0;
+	padding: 0 0 12px;
+}
+.bsn-slider .wc-block-product-template > li {
+	flex: 0 0 calc((100% - (var(--bsn-slider-cards) - 1) * var(--bsn-slider-gap)) / var(--bsn-slider-cards)) !important;
+	width: auto !important;
+	min-width: 0;
+	margin: 0 !important;
+	scroll-snap-align: start;
+}
+@media (min-width: 600px) {
+	.bsn-slider { --bsn-slider-gap: 16px; --bsn-slider-cards: 3; }
+}
+@media (min-width: 900px) {
+	.bsn-slider { --bsn-slider-gap: 24px; --bsn-slider-cards: 4; }
+}
+@media (min-width: 1152px) {
+	.bsn-slider { --bsn-slider-cards: 5; }
+}
+/* The arrows replace the scrollbar on desktop; touch keeps the thin bar as a hint, and no-JS keeps it too. */
+@media (hover: hover) and (pointer: fine), (min-width: 900px) {
+	.bsn-slider.is-enhanced { scrollbar-width: none; }
+	.bsn-slider.is-enhanced::-webkit-scrollbar { display: none; }
+	.bsn-slider.is-enhanced .wc-block-product-template { padding-bottom: 4px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+	.bsn-slider { scroll-behavior: smooth; }
 }
 
 /* Store information pages */

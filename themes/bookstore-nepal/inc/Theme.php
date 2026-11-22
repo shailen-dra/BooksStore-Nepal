@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.3';
+	public const VERSION = '0.1.7';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -62,6 +62,7 @@ final class Theme {
 		add_action( 'wp', array( self::class, 'relocate_book_details' ) );
 		add_action( 'after_switch_theme', array( self::class, 'ensure_front_page' ) );
 		add_filter( 'render_block_woocommerce/product-image', array( self::class, 'filter_product_image' ), 10, 3 );
+		add_filter( 'render_block_woocommerce/product-collection', array( self::class, 'filter_slider_region' ), 10, 2 );
 		add_filter( 'render_block_core/post-terms', array( self::class, 'filter_plain_terms' ), 10, 2 );
 		add_filter( 'render_block_core/group', array( self::class, 'filter_details_slot' ), 10, 2 );
 		// Templates run do_shortcode before do_blocks, so shortcode blocks inside patterns need their own pass.
@@ -76,6 +77,78 @@ final class Theme {
 	public static function enqueue(): void {
 		wp_enqueue_style( 'bsn-theme', get_stylesheet_uri(), array(), self::VERSION );
 		wp_style_add_data( 'bsn-theme', 'path', get_stylesheet_directory() . '/style.css' );
+		if ( is_front_page() ) {
+			wp_enqueue_script( 'bsn-slider', get_stylesheet_directory_uri() . '/assets/js/slider.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
+		}
+	}
+
+	/**
+	 * Sliders by key: the key is the `bsn-slider--{key}` modifier class, which survives an editor re-save.
+	 *
+	 * @return array<string,string> Key => accessible name.
+	 */
+	public static function slider_labels(): array {
+		return array(
+			'new-arrivals' => __( 'New arrivals', 'bookstore-nepal' ),
+			'best-sellers' => __( 'Best sellers', 'bookstore-nepal' ),
+		);
+	}
+
+	/**
+	 * Element ID of a slider's scrolling row.
+	 *
+	 * @param string $key Slider key.
+	 */
+	public static function slider_id( string $key ): string {
+		return 'bsn-slider-' . $key;
+	}
+
+	/**
+	 * Makes a slider's scrolling row a labelled, focusable region at render time.
+	 *
+	 * Keyed off the block's class (a declared attribute), and the attributes are not part of the
+	 * saved markup, so neither the editor nor a re-save can lose or flag them.
+	 *
+	 * @param string $html  Rendered block.
+	 * @param array  $block Parsed block.
+	 */
+	public static function filter_slider_region( $html, $block = array() ): string {
+		$html = (string) $html;
+		if ( ! str_contains( $html, 'bsn-slider--' ) ) {
+			return $html;
+		}
+		$tags = new \WP_HTML_Tag_Processor( $html );
+		if ( ! $tags->next_tag( array( 'class_name' => 'bsn-slider' ) ) ) {
+			return $html;
+		}
+		foreach ( self::slider_labels() as $key => $label ) {
+			if ( $tags->has_class( 'bsn-slider--' . $key ) ) {
+				$tags->set_attribute( 'id', self::slider_id( $key ) );
+				$tags->set_attribute( 'role', 'region' );
+				$tags->set_attribute( 'aria-label', $label );
+				$tags->set_attribute( 'tabindex', '0' );
+				return $tags->get_updated_html();
+			}
+		}
+		return $html;
+	}
+
+	/**
+	 * Previous/next buttons for a slider; hidden until slider.js shows them.
+	 *
+	 * @param string $row_id ID of the scrolling row.
+	 */
+	public static function slider_controls( string $row_id ): string {
+		$icon  = '<svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 20 20"><path d="%s" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+		$items = array(
+			'prev' => array( esc_attr__( 'Previous books', 'bookstore-nepal' ), 'M12.5 4 6.5 10l6 6' ),
+			'next' => array( esc_attr__( 'Next books', 'bookstore-nepal' ), 'M7.5 4l6 6-6 6' ),
+		);
+		$html  = '<div class="bsn-slider-controls">';
+		foreach ( $items as $dir => $item ) {
+			$html .= '<button type="button" class="bsn-slider-btn" data-bsn-slider-' . $dir . ' aria-label="' . $item[0] . '" aria-controls="' . esc_attr( $row_id ) . '" hidden>' . sprintf( $icon, $item[1] ) . '</button>';
+		}
+		return $html . '</div>';
 	}
 
 	/**
@@ -718,6 +791,7 @@ final class Theme {
 	 *     @type int    $heading_level Card title heading level.
 	 *     @type bool   $pagination    Whether to render pagination and the no-results message.
 	 *     @type string $class         Extra class.
+	 *     @type string $slider        Slider key (see slider_labels()); when set the row is a horizontal slider.
 	 * }
 	 */
 	public static function collection_markup( array $args ): string {
@@ -729,6 +803,7 @@ final class Theme {
 				'heading_level' => 3,
 				'pagination'    => false,
 				'class'         => '',
+				'slider'        => '',
 			),
 			$args
 		);
@@ -753,7 +828,8 @@ final class Theme {
 			),
 			$args['query']
 		);
-		$class = trim( 'bsn-products ' . $args['class'] );
+		$slider = isset( self::slider_labels()[ $args['slider'] ] ) ? (string) $args['slider'] : '';
+		$class  = implode( ' ', array_filter( array( 'bsn-products', $args['class'], '' !== $slider ? 'bsn-slider bsn-slider--' . $slider : '' ) ) );
 		$attrs = array(
 			'queryId'              => (int) $args['query_id'],
 			'query'                => $query,
