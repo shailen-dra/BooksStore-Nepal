@@ -12,6 +12,7 @@
 			var max = row.scrollWidth - row.clientWidth;
 			var active = document.activeElement;
 			prev.hidden = next.hidden = max <= 1;
+			row.classList.toggle( 'is-enhanced', max > 1 );
 			prev.disabled = row.scrollLeft <= 1;
 			next.disabled = row.scrollLeft >= max - 1;
 			// A disabled button cannot hold focus; hand it to the other button.

@@ -12,7 +12,7 @@ use BookstoreNepal\Theme\Theme;
 
 defined( 'ABSPATH' ) || exit;
 
-$bsn_query_id = 1;
+$bsn_slider = 'new-arrivals';
 ?>
 <!-- wp:group {"align":"wide","className":"bsn-section bsn-new","layout":{"type":"default"}} -->
 <div class="wp-block-group alignwide bsn-section bsn-new"><!-- wp:group {"className":"bsn-section__head","layout":{"type":"flex","flexWrap":"wrap","justifyContent":"space-between","verticalAlignment":"bottom"}} -->
@@ -28,7 +28,7 @@ $bsn_query_id = 1;
 <!-- wp:html -->
 <?php
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markup built and escaped by Theme.
-echo Theme::slider_controls( Theme::slider_id( $bsn_query_id ) );
+echo Theme::slider_controls( Theme::slider_id( $bsn_slider ) );
 ?>
 <!-- /wp:html --></div>
 <!-- /wp:group --></div>
@@ -38,8 +38,8 @@ echo Theme::slider_controls( Theme::slider_id( $bsn_query_id ) );
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Block markup built and escaped by Theme.
 echo Theme::collection_markup(
 	array(
-		'query_id' => $bsn_query_id,
-		'slider'   => __( 'New arrivals', 'bookstore-nepal' ),
+		'query_id' => 1,
+		'slider'   => $bsn_slider,
 		'query'    => array(
 			'orderBy' => 'date',
 			'order'   => 'desc',

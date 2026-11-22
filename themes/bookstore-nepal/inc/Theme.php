@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.5';
+	public const VERSION = '0.1.6';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -83,37 +83,54 @@ final class Theme {
 	}
 
 	/**
+	 * Sliders by key: the key is the `bsn-slider--{key}` modifier class, which survives an editor re-save.
+	 *
+	 * @return array<string,string> Key => accessible name.
+	 */
+	public static function slider_labels(): array {
+		return array(
+			'new-arrivals' => __( 'New arrivals', 'bookstore-nepal' ),
+			'best-sellers' => __( 'Best sellers', 'bookstore-nepal' ),
+		);
+	}
+
+	/**
 	 * Element ID of a slider's scrolling row.
 	 *
-	 * @param int $query_id Product Collection query ID.
+	 * @param string $key Slider key.
 	 */
-	public static function slider_id( int $query_id ): string {
-		return 'bsn-slider-' . $query_id;
+	public static function slider_id( string $key ): string {
+		return 'bsn-slider-' . $key;
 	}
 
 	/**
 	 * Makes a slider's scrolling row a labelled, focusable region at render time.
 	 *
-	 * The attributes are not part of the block's saved markup, so the editor does not flag them.
+	 * Keyed off the block's class (a declared attribute), and the attributes are not part of the
+	 * saved markup, so neither the editor nor a re-save can lose or flag them.
 	 *
 	 * @param string $html  Rendered block.
 	 * @param array  $block Parsed block.
 	 */
 	public static function filter_slider_region( $html, $block = array() ): string {
-		$html  = (string) $html;
-		$label = isset( $block['attrs']['bsnSliderLabel'] ) ? (string) $block['attrs']['bsnSliderLabel'] : '';
-		if ( '' === $label || ! str_contains( $html, 'bsn-slider' ) ) {
+		$html = (string) $html;
+		if ( ! str_contains( $html, 'bsn-slider--' ) ) {
 			return $html;
 		}
 		$tags = new \WP_HTML_Tag_Processor( $html );
 		if ( ! $tags->next_tag( array( 'class_name' => 'bsn-slider' ) ) ) {
 			return $html;
 		}
-		$tags->set_attribute( 'id', self::slider_id( (int) ( $block['attrs']['queryId'] ?? 0 ) ) );
-		$tags->set_attribute( 'role', 'region' );
-		$tags->set_attribute( 'aria-label', $label );
-		$tags->set_attribute( 'tabindex', '0' );
-		return $tags->get_updated_html();
+		foreach ( self::slider_labels() as $key => $label ) {
+			if ( $tags->has_class( 'bsn-slider--' . $key ) ) {
+				$tags->set_attribute( 'id', self::slider_id( $key ) );
+				$tags->set_attribute( 'role', 'region' );
+				$tags->set_attribute( 'aria-label', $label );
+				$tags->set_attribute( 'tabindex', '0' );
+				return $tags->get_updated_html();
+			}
+		}
+		return $html;
 	}
 
 	/**
@@ -774,7 +791,7 @@ final class Theme {
 	 *     @type int    $heading_level Card title heading level.
 	 *     @type bool   $pagination    Whether to render pagination and the no-results message.
 	 *     @type string $class         Extra class.
-	 *     @type string $slider        Accessible name; when set the row is a horizontal slider (region attributes are added at render time).
+	 *     @type string $slider        Slider key (see slider_labels()); when set the row is a horizontal slider.
 	 * }
 	 */
 	public static function collection_markup( array $args ): string {
@@ -811,7 +828,8 @@ final class Theme {
 			),
 			$args['query']
 		);
-		$class = implode( ' ', array_filter( array( 'bsn-products', $args['class'], '' !== $args['slider'] ? 'bsn-slider' : '' ) ) );
+		$slider = isset( self::slider_labels()[ $args['slider'] ] ) ? (string) $args['slider'] : '';
+		$class  = implode( ' ', array_filter( array( 'bsn-products', $args['class'], '' !== $slider ? 'bsn-slider bsn-slider--' . $slider : '' ) ) );
 		$attrs = array(
 			'queryId'              => (int) $args['query_id'],
 			'query'                => $query,
@@ -826,9 +844,6 @@ final class Theme {
 			'align'                => 'wide',
 			'className'            => $class,
 		);
-		if ( '' !== $args['slider'] ) {
-			$attrs['bsnSliderLabel'] = (string) $args['slider'];
-		}
 		if ( '' !== $args['collection'] ) {
 			$attrs['collection'] = $args['collection'];
 		}

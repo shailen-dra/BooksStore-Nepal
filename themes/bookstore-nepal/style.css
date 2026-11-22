@@ -3,7 +3,7 @@ Theme Name: Bookstore Nepal
 Description: Storefront for a children's bookstore in Nepal. Child theme of Twenty Twenty-Five; WooCommerce block templates, age and language browsing, gift finder.
 Author: Bookstore Nepal
 Template: twentytwentyfive
-Version: 0.1.5
+Version: 0.1.6
 Requires at least: 6.6
 Requires PHP: 8.1
 License: GNU General Public License v2 or later
@@ -730,6 +730,12 @@ body {
 }
 @media (min-width: 1152px) {
 	.bsn-slider { --bsn-slider-cards: 5; }
+}
+/* The arrows replace the scrollbar on desktop; touch keeps the thin bar as a hint, and no-JS keeps it too. */
+@media (hover: hover) and (pointer: fine), (min-width: 900px) {
+	.bsn-slider.is-enhanced { scrollbar-width: none; }
+	.bsn-slider.is-enhanced::-webkit-scrollbar { display: none; }
+	.bsn-slider.is-enhanced .wc-block-product-template { padding-bottom: 4px; }
 }
 @media (prefers-reduced-motion: no-preference) {
 	.bsn-slider { scroll-behavior: smooth; }
