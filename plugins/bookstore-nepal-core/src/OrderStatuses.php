@@ -35,9 +35,6 @@ class OrderStatuses {
 		add_filter( 'woocommerce_order_is_paid_statuses', array( self::class, 'paid_statuses' ) );
 		add_filter( 'bulk_actions-edit-shop_order', array( self::class, 'bulk_actions' ) );
 		add_filter( 'bulk_actions-woocommerce_page_wc-orders', array( self::class, 'bulk_actions' ) );
-		add_filter( 'handle_bulk_actions-edit-shop_order', array( self::class, 'handle_bulk' ), 10, 3 );
-		add_filter( 'handle_bulk_actions-woocommerce_page_wc-orders', array( self::class, 'handle_bulk' ), 10, 3 );
-		add_action( 'admin_notices', array( self::class, 'bulk_notice' ) );
 	}
 
 	/**
@@ -96,7 +93,8 @@ class OrderStatuses {
 	}
 
 	/**
-	 * Adds the bulk actions to the orders screen.
+	 * Adds the bulk actions to the orders screen. WooCommerce itself applies any mark_<status> action
+	 * whose status is registered, and shows its own confirmation notice.
 	 *
 	 * @param array $actions Bulk actions.
 	 * @return array
@@ -106,44 +104,5 @@ class OrderStatuses {
 		$actions['mark_packed']  = __( 'Change status to packed', 'bookstore-nepal' );
 		$actions['mark_shipped'] = __( 'Change status to shipped', 'bookstore-nepal' );
 		return $actions;
-	}
-
-	/**
-	 * Applies the bulk status change.
-	 *
-	 * @param string $redirect Redirect URL.
-	 * @param string $action   Chosen bulk action.
-	 * @param array  $ids      Selected order ids.
-	 * @return string
-	 */
-	public static function handle_bulk( $redirect, $action, $ids ) {
-		if ( ! in_array( $action, array( 'mark_packed', 'mark_shipped' ), true ) || ! current_user_can( 'edit_shop_orders' ) ) {
-			return $redirect;
-		}
-		$status  = 'mark_packed' === $action ? 'packed' : 'shipped';
-		$changed = 0;
-		foreach ( (array) $ids as $id ) {
-			$order = wc_get_order( absint( $id ) );
-			if ( $order instanceof \WC_Order ) {
-				$order->update_status( $status, __( 'Order status changed by bulk edit.', 'bookstore-nepal' ), true );
-				++$changed;
-			}
-		}
-		return add_query_arg( 'bsn_changed', $changed, $redirect );
-	}
-
-	/**
-	 * Confirms a bulk change.
-	 */
-	public static function bulk_notice(): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! isset( $_GET['bsn_changed'] ) || ! current_user_can( 'edit_shop_orders' ) ) {
-			return;
-		}
-		$count = absint( wp_unslash( $_GET['bsn_changed'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html(
-			/* translators: %d: number of orders. */
-			sprintf( _n( '%d order status changed.', '%d order statuses changed.', $count, 'bookstore-nepal' ), $count )
-		) . '</p></div>';
 	}
 }

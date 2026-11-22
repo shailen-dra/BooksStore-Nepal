@@ -43,29 +43,22 @@ class OrderStatusesTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_bulk_handler_updates_orders(): void {
-		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+	public function test_woocommerce_applies_bulk_action_for_custom_statuses(): void {
+		require_once WC_ABSPATH . 'includes/admin/list-tables/abstract-class-wc-admin-list-table.php';
+		require_once WC_ABSPATH . 'includes/admin/list-tables/class-wc-admin-list-table-orders.php';
 		$order = wc_create_order();
 		$order->set_status( 'processing' );
 		$order->save();
 
-		$redirect = apply_filters( 'handle_bulk_actions-woocommerce_page_wc-orders', 'admin.php?page=wc-orders', 'mark_packed', array( $order->get_id() ) );
+		// The legacy orders screen runs this core handler on handle_bulk_actions-edit-shop_order.
+		$table    = new WC_Admin_List_Table_Orders();
+		$redirect = $table->handle_bulk_actions( 'edit.php', 'mark_packed', array( $order->get_id() ) );
 		$this->assertSame( 'packed', wc_get_order( $order->get_id() )->get_status() );
-		$this->assertStringContainsString( 'bsn_changed=1', $redirect );
+		$this->assertStringContainsString( 'bulk_action=marked_packed', $redirect );
+		$this->assertStringContainsString( 'changed=1', $redirect );
 
-		apply_filters( 'handle_bulk_actions-edit-shop_order', 'edit.php', 'mark_shipped', array( $order->get_id() ) );
+		$table->handle_bulk_actions( 'edit.php', 'mark_shipped', array( $order->get_id() ) );
 		$this->assertSame( 'shipped', wc_get_order( $order->get_id() )->get_status() );
-
-		$untouched = apply_filters( 'handle_bulk_actions-edit-shop_order', 'edit.php', 'trash', array( $order->get_id() ) );
-		$this->assertSame( 'edit.php', $untouched );
-	}
-
-	public function test_bulk_handler_ignores_users_without_capability(): void {
-		wp_set_current_user( self::factory()->user->create( array( 'role' => 'customer' ) ) );
-		$order = wc_create_order();
-		$order->set_status( 'processing' );
-		$order->save();
-		apply_filters( 'handle_bulk_actions-woocommerce_page_wc-orders', 'x', 'mark_packed', array( $order->get_id() ) );
-		$this->assertSame( 'processing', wc_get_order( $order->get_id() )->get_status() );
+		$this->assertCount( 1, wc_get_order_notes( array( 'order_id' => $order->get_id(), 'type' => 'internal', 'search' => 'Shipped' ) ) );
 	}
 }
