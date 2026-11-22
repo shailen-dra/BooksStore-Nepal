@@ -74,8 +74,8 @@ When a customer places an order, you receive an email, and the order appears und
 
 | Status | Meaning |
 | --- | --- |
-| **Pending payment** | Customer chose eSewa but has not finished paying yet. Do not pack it. |
-| **Processing** | The order is confirmed (paid by eSewa, or cash on delivery). Time to pack it. |
+| **Pending payment** | Customer chose eSewa or Khalti but has not finished paying yet. Do not pack it. |
+| **Processing** | The order is confirmed (paid by eSewa or Khalti, or cash on delivery). Time to pack it. |
 | **Packed** | The books are packed and ready for the courier. |
 | **Shipped** | Handed to the courier or rider. |
 | **Delivered** | The customer has received the books. |
@@ -121,6 +121,24 @@ An eSewa order that has no note yet may simply be waiting: eSewa said "pending",
 For an unpaid eSewa order **older than 48 hours**, the website has stopped checking. Before you cancel such an order or put its books back into stock, log in to the **eSewa merchant portal** and search for a transaction for that order (the order number and amount). If eSewa shows the money was received, treat the order as paid: set it to **Processing** and pack it, or refund the customer from the eSewa portal. Only cancel the order if eSewa shows no completed payment.
 
 If an order has a note starting "eSewa reported a successful payment for this order after it was switched to another payment method", the customer paid with eSewa and then changed the order to cash on delivery (the note ends "signed by eSewa" or "confirmed by eSewa status check" when eSewa itself reported it). Look up the transaction in the eSewa merchant portal using the transaction UUID in the note, and refund the eSewa payment (or collect no cash on delivery) so the customer does not pay twice. The website adds this note once per payment.
+
+**Khalti orders.** They work like eSewa orders. The customer is sent to Khalti to pay (Khalti wallet, mobile banking or card). The order moves to **Processing** by itself only once Khalti confirms the payment for the full order amount. If the customer cancels on the Khalti page or the payment link expires, the order becomes **Failed** and the customer can try again or choose another payment method. Every 5 minutes the website also asks Khalti about unpaid Khalti orders placed between 10 minutes and 48 hours ago (including earlier payment attempts on the same order), completes those Khalti says were paid, and asks Khalti before an unpaid Khalti order is cancelled for being too old. The order notes tell you what happened:
+
+| Note says | What it means | What to do |
+| --- | --- | --- |
+| "Khalti payment confirmed by lookup" | The customer paid and came back to the site. The note has Khalti's transaction ID. | Nothing. Pack it like any paid order. |
+| "Payment confirmed by Khalti lookup (customer did not return to the site)" | Khalti confirmed the payment after the customer left. | Nothing. Pack it like any paid order. |
+| "Khalti payment was not completed: Khalti lookup returned User canceled" (or Expired) | The customer cancelled on Khalti, or the payment link expired. The order is **Failed**. | Nothing. The customer can pay again or choose another method. |
+| "Khalti payment check for pidx … returned User canceled" (or Expired) | Found by the automatic check: no payment for that attempt. | Nothing. The order is cancelled automatically later, or the customer pays again. |
+| "Customer returned from Khalti (pidx …), payment not confirmed yet" | Khalti said the payment is still pending, or could not be reached. | Nothing yet. The automatic check completes the order if Khalti confirms it. |
+| "Khalti payment check for pidx … returned Refunded" | The payment was refunded in full in Khalti. The order is not marked paid. | Check the Khalti merchant dashboard if you did not expect a refund. |
+| "… returned Partially Refunded. Khalti still holds part of this payment" | Only part of the payment was refunded; Khalti still holds the rest. | Check the Khalti merchant dashboard, then refund the rest or complete the order by hand. |
+| "… amount mismatch" | Khalti has a completed payment, but for a different amount than the order total (for example, the order was edited after payment). **The order is never cancelled automatically.** | Compare the amounts in the Khalti merchant dashboard, then set the order to **Processing**, refund the difference, or refund and cancel it. |
+| "Khalti took a second payment for this order — refund transaction … in the Khalti merchant portal" | The order is paid, but the customer also paid on another attempt. | Refund that second transaction in the Khalti merchant dashboard. Keep the order as it is. |
+| "Khalti confirmed a payment for this order after it was switched to another payment method" | The customer paid with Khalti, then changed the order to cash on delivery. The order is not marked paid. | Refund the Khalti payment (or collect no cash on delivery) so the customer does not pay twice. |
+| "Khalti payment could not be started" | Khalti refused to start the payment (for example a wrong key, or an order under NPR 10). The customer was asked to try again. | If it keeps happening, check the Khalti key in **WooCommerce › Settings › Payments › Khalti**. |
+
+Each of these notes is added once per payment attempt. **How to refund a Khalti payment:** log in to the Khalti merchant dashboard (https://admin.khalti.com), find the transaction by the transaction ID or pidx from the order note (or by amount and date), and refund it there. The website does not send refunds to Khalti by itself; after refunding, set the order to **Cancelled** or **Refunded** in WooCommerce as appropriate. As with eSewa, for an unpaid Khalti order **older than 48 hours** the website has stopped checking: look the order up in the Khalti dashboard before you cancel it.
 
 **Customers can track their order** on the "Track your order" page of the website, using their order number and email.
 

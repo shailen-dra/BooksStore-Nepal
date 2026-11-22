@@ -1,6 +1,6 @@
 # BooksStore-Nepal
 
-Online children's bookstore for Nepal, built on WordPress + WooCommerce. Customers browse books by age group, language and type, and pay with **eSewa** or **cash on delivery** (**Khalti** is planned; see "Payments" below), with delivery anywhere in Nepal. The shop owner manages books, prices, stock and orders from wp-admin.
+Online children's bookstore for Nepal, built on WordPress + WooCommerce. Customers browse books by age group, language and type, and pay with **eSewa**, **Khalti** or **cash on delivery**, with delivery anywhere in Nepal. The shop owner manages books, prices, stock and orders from wp-admin.
 
 ## Documents
 
@@ -28,7 +28,7 @@ This repo holds only our custom code. WordPress core, WooCommerce and third-part
 - WordPress 6.x + WooCommerce
 - PHP 8.1+ (local: Laravel Herd, PHP 8.3), MariaDB 10.6+ or MySQL 8
 - WP-CLI, Composer, PHPUnit 9
-- Payments: eSewa ePay v2 (custom gateway in our plugin), Khalti (official WooCommerce plugin), WooCommerce cash on delivery
+- Payments: eSewa ePay v2 and Khalti Web Checkout (KPG-2), both custom gateways in our plugin with block checkout support and automatic payment checks; WooCommerce cash on delivery
 
 ## Local development
 
@@ -82,7 +82,7 @@ vendor/bin/phpunit
 ## Payments: test mode
 
 - **eSewa:** WooCommerce → Settings → Payments → eSewa. Test mode uses product code `EPAYTEST` and eSewa's public test secret. Live keys come from the client's eSewa merchant account.
-- **Khalti:** plugin slug `integrate-khalti-in-wc-store` ("Integrate Khalti in WC Store", wordpress.org account `khaltiwp`, built by ACT360, linked from khalti.com). Install it with `wp plugin install integrate-khalti-in-wc-store` and leave it **inactive** (see "Khalti status" in [docs/deployment.md](docs/deployment.md)). **Known limitation:** this plugin has no WooCommerce Blocks integration, so it does not render in the block checkout, which this site uses. It ships enabled by default once activated. To try it in sandbox, activate it, enter sandbox keys from the Khalti merchant dashboard in WooCommerce -> Settings -> Payments -> Khalti, and switch it off again afterwards. The storefront only mentions Khalti while its gateway is enabled.
+- **Khalti:** WooCommerce → Settings → Payments → Khalti (our gateway, id `bsn_khalti`). Test mode (on by default) uses `dev.khalti.com` with the **Test secret key** from https://test-admin.khalti.com; live mode uses the **Live secret key** from the client's Khalti merchant dashboard. Khalti is offered at checkout only with NPR and a key for the current mode, and the storefront only mentions it then. Do not install the third-party plugin `integrate-khalti-in-wc-store` (no block checkout support). See "Khalti" in [docs/deployment.md](docs/deployment.md).
 - Never commit payment keys. They live only in each site's wp-admin settings.
 
 ## Open items from the client
