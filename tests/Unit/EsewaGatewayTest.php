@@ -238,6 +238,33 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 		$this->assertContains( 'We’re still confirming your eSewa payment. Please refresh this page in a moment, or contact us if it does not update.', $notices );
 	}
 
+	public function test_lock_held_on_failure_return_tells_customer_we_are_checking(): void {
+		$order = $this->order();
+		$other = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+		$other->get_var( $other->prepare( 'SELECT GET_LOCK(%s, 0)', 'bsn_esewa_' . $order->get_id() ) );
+		add_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
+		$log      = wp_tempnam( 'bsn-esewa-log' );
+		$previous = ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet
+		try {
+			$this->gateway->handle_callback(
+				array(
+					'result'   => 'failure',
+					'order_id' => (string) $order->get_id(),
+					'key'      => $order->get_order_key(),
+				)
+			);
+		} finally {
+			ini_set( 'error_log', (string) $previous ); // phpcs:ignore WordPress.PHP.IniSet
+			unlink( $log );
+			remove_filter( 'bsn_esewa_lock_timeout', '__return_zero' );
+			$other->query( $other->prepare( 'SELECT RELEASE_LOCK(%s)', 'bsn_esewa_' . $order->get_id() ) );
+			$other->close();
+		}
+		$notices = wp_list_pluck( wc_get_notices( 'notice' ), 'notice' );
+		$this->assertContains( 'We’re still checking this order with eSewa. Please refresh this page in a moment, or contact us if it does not update.', $notices );
+		$this->assertNotContains( 'We’re still confirming your eSewa payment. Please refresh this page in a moment, or contact us if it does not update.', $notices );
+	}
+
 	private function notes( WC_Order $order ): string {
 		return implode( "\n", wp_list_pluck( wc_get_order_notes( array( 'order_id' => $order->get_id() ) ), 'content' ) );
 	}
@@ -261,6 +288,64 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 
 		$result = $this->gateway->process_payment( $order->get_id() );
 		$this->assertSame( $order->get_checkout_payment_url( true ), $result['redirect'] );
+	}
+
+	public function test_every_minted_uuid_is_remembered_with_its_amount(): void {
+		$order = $this->order();
+		$first = (string) $order->get_meta( EsewaGateway::META_UUID );
+		$this->assertSame( array( $first => '500' ), $order->get_meta( EsewaGateway::META_UUIDS ) );
+
+		// The customer comes back and tries again a few seconds later: a new UUID is minted.
+		$order->update_meta_data( EsewaGateway::META_UUID, $order->get_id() . '-1700000000' );
+		$order->update_meta_data( EsewaGateway::META_UUIDS, array( $order->get_id() . '-1700000000' => '500' ) );
+		$order->save();
+		$this->gateway->process_payment( $order->get_id() );
+		$order  = $this->fresh( $order );
+		$second = (string) $order->get_meta( EsewaGateway::META_UUID );
+		$this->assertNotSame( $order->get_id() . '-1700000000', $second );
+		$this->assertSame(
+			array(
+				$order->get_id() . '-1700000000' => '500',
+				$second                          => '500',
+			),
+			$order->get_meta( EsewaGateway::META_UUIDS )
+		);
+		$this->assertSame( array( $order->get_id() . '-1700000000', $second ), array_keys( $this->gateway->remembered_uuids( $order ) ) );
+	}
+
+	public function test_uuid_minted_by_receipt_page_is_remembered(): void {
+		$order = $this->order();
+		$order->delete_meta_data( EsewaGateway::META_UUID );
+		$order->delete_meta_data( EsewaGateway::META_UUIDS );
+		$order->save();
+		$form = $this->gateway->form_fields_for( $this->fresh( $order ) );
+		$this->assertSame( array( $form['transaction_uuid'] => '500' ), $this->fresh( $order )->get_meta( EsewaGateway::META_UUIDS ) );
+	}
+
+	public function test_uuid_from_before_the_list_existed_is_remembered(): void {
+		$order = $this->order();
+		$order->delete_meta_data( EsewaGateway::META_UUIDS );
+		$order->update_meta_data( EsewaGateway::META_UUID, $order->get_id() . '-1700000000' );
+		$order->save();
+		$this->assertSame( array( $order->get_id() . '-1700000000' => '500' ), $this->gateway->remembered_uuids( $this->fresh( $order ) ) );
+	}
+
+	public function test_remembered_uuids_are_capped_dropping_the_oldest(): void {
+		$order = $this->order();
+		$list  = array();
+		for ( $i = 1; $i <= EsewaGateway::MAX_REMEMBERED_UUIDS; $i++ ) {
+			$list[ $order->get_id() . '-' . ( 1700000000 + $i ) ] = '500';
+		}
+		$order->update_meta_data( EsewaGateway::META_UUIDS, $list );
+		$order->save();
+		$this->gateway->process_payment( $order->get_id() );
+
+		$order      = $this->fresh( $order );
+		$remembered = $order->get_meta( EsewaGateway::META_UUIDS );
+		$this->assertCount( EsewaGateway::MAX_REMEMBERED_UUIDS, $remembered );
+		$this->assertArrayNotHasKey( $order->get_id() . '-1700000001', $remembered, 'Oldest dropped.' );
+		$this->assertArrayHasKey( $order->get_id() . '-1700000002', $remembered );
+		$this->assertArrayHasKey( (string) $order->get_meta( EsewaGateway::META_UUID ), $remembered, 'Newest kept.' );
 	}
 
 	public function test_receipt_form_posts_signed_fields_to_test_form_url(): void {
@@ -385,6 +470,49 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 		$this->assert_unpaid_with_note( $order, 'callback rejected: transaction does not belong to this order' );
 		$this->assertSame( array(), $this->requested, 'Rejected before the status API.' );
 		$this->assertSame( 'pending', $this->fresh( $other )->get_status() );
+	}
+
+	public function test_signed_callback_for_an_earlier_attempt_completes_the_order(): void {
+		// First attempt: the customer pays, but the tab dies before the callback.
+		$order   = $this->order();
+		$earlier = $order->get_id() . '-1700000000';
+		$order->update_meta_data( EsewaGateway::META_UUID, $earlier );
+		$order->update_meta_data( EsewaGateway::META_UUIDS, array( $earlier => '500' ) );
+		$order->save();
+		$payload = $this->payload( $this->fresh( $order ) ); // Signed for the earlier UUID.
+		// They retry (new UUID), then eSewa's success redirect for the first attempt arrives.
+		$this->gateway->process_payment( $order->get_id() );
+		$order = $this->fresh( $order );
+		$this->assertNotSame( $earlier, $order->get_meta( EsewaGateway::META_UUID ) );
+		$this->status_api( 'COMPLETE', $earlier );
+
+		$redirect = $this->gateway->handle_callback( $this->success_query( $order, $payload ) );
+
+		$order = $this->fresh( $order );
+		$this->assertSame( $order->get_checkout_order_received_url(), $redirect );
+		$this->assertSame( 'processing', $order->get_status() );
+		$this->assertSame( '0LD5CEH', $order->get_transaction_id() );
+		$this->assertSame( $earlier, $order->get_meta( EsewaGateway::META_PAID_UUID ) );
+		$this->assertSame( 9, wc_get_product( $this->product->get_id() )->get_stock_quantity() );
+		$this->assertCount( 1, $this->requested );
+		$this->assertStringContainsString( 'transaction_uuid=' . $earlier, $this->requested[0] );
+		$this->assertStringContainsString( 'total_amount=500', $this->requested[0] );
+	}
+
+	public function test_callback_for_earlier_attempt_still_needs_status_api_and_amount(): void {
+		$order   = $this->order();
+		$earlier = $order->get_id() . '-1700000000';
+		$order->update_meta_data( EsewaGateway::META_UUIDS, array( $earlier => '500' ) + $this->gateway->remembered_uuids( $order ) );
+		$order->save();
+		$order = $this->fresh( $order );
+		$this->status_api( 'PENDING', $earlier );
+		$this->gateway->handle_callback( $this->success_query( $order, $this->payload( $order, array( 'transaction_uuid' => $earlier ) ) ) );
+		$this->assert_unpaid_with_note( $order, 'PENDING' );
+
+		wc_clear_notices();
+		$this->status_api( 'COMPLETE', $earlier );
+		$this->gateway->handle_callback( $this->success_query( $order, $this->payload( $order, array( 'transaction_uuid' => $earlier, 'total_amount' => '400.0' ) ) ) );
+		$this->assert_unpaid_with_note( $order, 'amount mismatch' );
 	}
 
 	public function test_wrong_order_key_rejected(): void {

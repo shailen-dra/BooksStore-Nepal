@@ -39,7 +39,7 @@ $bsn_pay   = Theme::payment_list( 'or' );
 <?php if ( null !== $bsn_rates['free_over'] ) : ?>
 <!-- wp:paragraph -->
 <?php /* translators: %s: order total for free delivery, e.g. NPR 2,000. */ ?>
-<p><?php echo esc_html( sprintf( __( 'Free delivery on orders over %s', 'bookstore-nepal' ), Theme::npr( $bsn_rates['free_over'] ) ) ); ?></p>
+<p><?php echo esc_html( sprintf( __( 'Free delivery on orders of %s or more', 'bookstore-nepal' ), Theme::npr( $bsn_rates['free_over'] ) ) ); ?></p>
 <!-- /wp:paragraph -->
 <?php endif; ?>
 <?php if ( '' !== $bsn_pay ) : ?>

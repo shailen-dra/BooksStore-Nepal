@@ -29,7 +29,7 @@ Customers can pay three ways, and books can be delivered anywhere in Nepal.
 | Khalti | Same flow through Khalti (official WooCommerce plugin) | A Khalti merchant account |
 | Cash on delivery | Customer pays the courier on delivery; you mark the order paid | Agreement with your courier on cash collection |
 
-**Delivery charges** will be set by zone, for example one rate inside Kathmandu Valley and another outside it. A free-delivery threshold (e.g. orders over NPR 2,000) can be added. You can change these rates yourselves at any time.
+**Delivery charges** will be set by zone, for example one rate inside Kathmandu Valley and another outside it. A free-delivery threshold (e.g. orders of NPR 2,000 or more) can be added. You can change these rates yourselves at any time.
 
 **Couriers:** orders can be handed to a delivery partner such as Pathao, Upaya or Nepal Can Move; we will set up whichever you already use.
 

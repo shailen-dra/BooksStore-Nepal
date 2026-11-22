@@ -77,7 +77,7 @@ vendor/bin/phpunit
 # Optional env: WP_TESTS_DIR (default: <repo>/.wp-tests-lib, git-ignored; WordPress core for the tests goes in <repo>/.wp-tests-wordpress), WC_PLUGIN_DIR (default: the Herd site's WooCommerce)
 ```
 
-> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. `wp bsn setup` leaves existing shipping rates alone; pass `--valley=<npr> --rest=<npr> --free-over=<npr>` to change them. Store defaults the owner can change (cash on delivery, stock alerts, guest checkout, decimals, required phone, Nepal-only countries) are applied on the first run only; `wp option delete bsn_setup_done` makes the next run apply them again. Placeholder contact details (phone, WhatsApp, address) live in the theme footer: Appearance › Editor › Patterns › Footer. WooCommerce's "coming soon" mode hides store pages from visitors until you launch (WooCommerce › Settings › Site visibility).
+> If WP-CLI runs out of memory, run it as `php -d memory_limit=512M $(which wp) ...`. `wp bsn setup` leaves existing shipping rates alone; pass `--valley=<npr> --rest=<npr> --free-over=<npr>` to change them. Store defaults the owner can change (cash on delivery, stock alerts, guest checkout, decimals, required phone, Nepal-only countries) are applied on the first run only; `wp option delete bsn_setup_done` makes the next run apply them again. `wp bsn setup` also creates the store information pages (About, Contact, Delivery, Returns, Privacy, Terms, FAQ) without overwriting any page the owner edited. Contact details (phone, WhatsApp, email, address) are set in WooCommerce › Settings › General, or with `--phone= --whatsapp= --email=`, and feed the Contact page and footer. WooCommerce's "coming soon" mode hides store pages from visitors until you launch (WooCommerce › Settings › Site visibility).
 
 ## Payments: test mode
 
@@ -87,4 +87,4 @@ vendor/bin/phpunit
 
 ## Open items from the client
 
-Shop name and logo, domain, eSewa and Khalti merchant accounts, real delivery rates (the plan uses placeholders: Valley NPR 100, rest of Nepal NPR 200, free over NPR 2,000), courier partner, return policy, first 20–30 books. See the proposal's "Next steps" section.
+Shop name and logo, domain, eSewa and Khalti merchant accounts, real delivery rates (the plan uses placeholders: Valley NPR 100, rest of Nepal NPR 200, free on orders of NPR 2,000 or more), courier partner, return policy, first 20–30 books. See the proposal's "Next steps" section.

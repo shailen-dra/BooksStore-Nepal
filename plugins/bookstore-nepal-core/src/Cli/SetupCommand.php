@@ -8,7 +8,9 @@
 namespace BookstoreNepal\Cli;
 
 use BookstoreNepal\Catalog;
+use BookstoreNepal\ShopContact;
 use BookstoreNepal\Shipping;
+use BookstoreNepal\StorePages;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,6 +35,13 @@ class SetupCommand {
 	private bool $defaults_skipped = false;
 
 	/**
+	 * What the last run did with each store information page (key => outcome).
+	 *
+	 * @var array<string,string>
+	 */
+	private array $page_report = array();
+
+	/**
 	 * Registers the command when WP-CLI is running.
 	 */
 	public static function register(): void {
@@ -42,7 +51,7 @@ class SetupCommand {
 	}
 
 	/**
-	 * Applies store settings, catalogue attributes, shipping zones, COD and the tracking page.
+	 * Applies store settings, catalogue attributes, shipping zones, COD, the tracking page and the store information pages.
 	 *
 	 * Store defaults the owner can change in wp-admin (cash on delivery, low-stock alerts, guest
 	 * checkout, price decimals, required phone, selling and shipping to Nepal only) are applied on
@@ -60,6 +69,15 @@ class SetupCommand {
 	 * [--free-over=<npr>]
 	 * : Order total above which delivery is free, in NPR.
 	 *
+	 * [--phone=<number>]
+	 * : Shop phone number shown on the Contact page and in the footer. Set only when given; an empty value clears it.
+	 *
+	 * [--whatsapp=<number>]
+	 * : WhatsApp number: a Nepali mobile, e.g. 9812345678 or 9779812345678. Set only when given.
+	 *
+	 * [--email=<address>]
+	 * : Contact email shown to customers. Set only when given; an empty value clears it (the footer then shows a placeholder).
+	 *
 	 * @param array $args       Positional arguments (unused).
 	 * @param array $assoc_args Flags.
 	 */
@@ -67,6 +85,12 @@ class SetupCommand {
 		$errors = $this->run( (array) $assoc_args );
 		if ( $this->defaults_skipped ) {
 			\WP_CLI::log( 'Store defaults (cash on delivery, stock alerts, guest checkout, decimals, phone, countries) were not changed because setup already ran. To re-apply them: wp option delete ' . self::DONE_OPTION . ' && wp bsn setup' );
+		}
+		foreach ( $this->page_report as $key => $outcome ) {
+			\WP_CLI::log( sprintf( 'Page %s: %s', $key, $outcome ) );
+		}
+		if ( $this->page_report && ! StorePages::pattern_available() ) {
+			\WP_CLI::warning( 'The Bookstore Nepal theme is not active, so the store information pages got a short placeholder paragraph instead of their text. Activate the theme, then delete those pages (or their stored IDs) and run setup again, or write the text in the page editor.' );
 		}
 		foreach ( $errors as $error ) {
 			\WP_CLI::warning( $error );
@@ -80,7 +104,7 @@ class SetupCommand {
 	/**
 	 * Does the work; testable without WP-CLI.
 	 *
-	 * @param array $assoc_args Flags: valley, rest, free-over.
+	 * @param array $assoc_args Flags: valley, rest, free-over, phone, whatsapp, email.
 	 * @return string[] Error messages; empty means success.
 	 */
 	public function run( array $assoc_args ): array {
@@ -97,8 +121,24 @@ class SetupCommand {
 			}
 			$rates[ $key ] = (int) $value;
 		}
+		$contact = array();
+		foreach ( array( 'phone' => array( ShopContact::PHONE, 'sanitize_phone' ), 'whatsapp' => array( ShopContact::WHATSAPP, 'sanitize_whatsapp' ), 'email' => array( ShopContact::EMAIL, 'sanitize_email' ) ) as $flag => $map ) {
+			if ( ! array_key_exists( $flag, $assoc_args ) ) {
+				continue;
+			}
+			$raw   = is_scalar( $assoc_args[ $flag ] ) ? trim( (string) $assoc_args[ $flag ] ) : '';
+			$clean = ShopContact::{$map[1]}( $raw );
+			if ( '' !== $raw && '' === $clean ) {
+				$errors[] = sprintf( '--%s is not a valid value.', $flag );
+				continue;
+			}
+			$contact[ $map[0] ] = $clean;
+		}
 		if ( $errors ) {
 			return $errors;
+		}
+		foreach ( $contact as $option => $value ) {
+			update_option( $option, $value );
 		}
 
 		update_option( 'woocommerce_currency', 'NPR' );
@@ -117,6 +157,8 @@ class SetupCommand {
 		}
 
 		$this->ensure_tracking_page();
+		// Structural like the tracking page, so it runs every time; it never touches a page the owner has published or edited.
+		$this->page_report = StorePages::ensure_all();
 
 		$errors = array_merge( Catalog::install(), Shipping::seed( $rates ) );
 

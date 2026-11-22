@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.2';
+	public const VERSION = '0.1.7';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -62,6 +62,7 @@ final class Theme {
 		add_action( 'wp', array( self::class, 'relocate_book_details' ) );
 		add_action( 'after_switch_theme', array( self::class, 'ensure_front_page' ) );
 		add_filter( 'render_block_woocommerce/product-image', array( self::class, 'filter_product_image' ), 10, 3 );
+		add_filter( 'render_block_woocommerce/product-collection', array( self::class, 'filter_slider_region' ), 10, 2 );
 		add_filter( 'render_block_core/post-terms', array( self::class, 'filter_plain_terms' ), 10, 2 );
 		add_filter( 'render_block_core/group', array( self::class, 'filter_details_slot' ), 10, 2 );
 		// Templates run do_shortcode before do_blocks, so shortcode blocks inside patterns need their own pass.
@@ -76,6 +77,78 @@ final class Theme {
 	public static function enqueue(): void {
 		wp_enqueue_style( 'bsn-theme', get_stylesheet_uri(), array(), self::VERSION );
 		wp_style_add_data( 'bsn-theme', 'path', get_stylesheet_directory() . '/style.css' );
+		if ( is_front_page() ) {
+			wp_enqueue_script( 'bsn-slider', get_stylesheet_directory_uri() . '/assets/js/slider.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
+		}
+	}
+
+	/**
+	 * Sliders by key: the key is the `bsn-slider--{key}` modifier class, which survives an editor re-save.
+	 *
+	 * @return array<string,string> Key => accessible name.
+	 */
+	public static function slider_labels(): array {
+		return array(
+			'new-arrivals' => __( 'New arrivals', 'bookstore-nepal' ),
+			'best-sellers' => __( 'Best sellers', 'bookstore-nepal' ),
+		);
+	}
+
+	/**
+	 * Element ID of a slider's scrolling row.
+	 *
+	 * @param string $key Slider key.
+	 */
+	public static function slider_id( string $key ): string {
+		return 'bsn-slider-' . $key;
+	}
+
+	/**
+	 * Makes a slider's scrolling row a labelled, focusable region at render time.
+	 *
+	 * Keyed off the block's class (a declared attribute), and the attributes are not part of the
+	 * saved markup, so neither the editor nor a re-save can lose or flag them.
+	 *
+	 * @param string $html  Rendered block.
+	 * @param array  $block Parsed block.
+	 */
+	public static function filter_slider_region( $html, $block = array() ): string {
+		$html = (string) $html;
+		if ( ! str_contains( $html, 'bsn-slider--' ) ) {
+			return $html;
+		}
+		$tags = new \WP_HTML_Tag_Processor( $html );
+		if ( ! $tags->next_tag( array( 'class_name' => 'bsn-slider' ) ) ) {
+			return $html;
+		}
+		foreach ( self::slider_labels() as $key => $label ) {
+			if ( $tags->has_class( 'bsn-slider--' . $key ) ) {
+				$tags->set_attribute( 'id', self::slider_id( $key ) );
+				$tags->set_attribute( 'role', 'region' );
+				$tags->set_attribute( 'aria-label', $label );
+				$tags->set_attribute( 'tabindex', '0' );
+				return $tags->get_updated_html();
+			}
+		}
+		return $html;
+	}
+
+	/**
+	 * Previous/next buttons for a slider; hidden until slider.js shows them.
+	 *
+	 * @param string $row_id ID of the scrolling row.
+	 */
+	public static function slider_controls( string $row_id ): string {
+		$icon  = '<svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 20 20"><path d="%s" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+		$items = array(
+			'prev' => array( esc_attr__( 'Previous books', 'bookstore-nepal' ), 'M12.5 4 6.5 10l6 6' ),
+			'next' => array( esc_attr__( 'Next books', 'bookstore-nepal' ), 'M7.5 4l6 6-6 6' ),
+		);
+		$html  = '<div class="bsn-slider-controls">';
+		foreach ( $items as $dir => $item ) {
+			$html .= '<button type="button" class="bsn-slider-btn" data-bsn-slider-' . $dir . ' aria-label="' . $item[0] . '" aria-controls="' . esc_attr( $row_id ) . '" hidden>' . sprintf( $icon, $item[1] ) . '</button>';
+		}
+		return $html . '</div>';
 	}
 
 	/**
@@ -234,14 +307,130 @@ final class Theme {
 	 * "Track your order" page URL (created by `wp bsn setup`).
 	 */
 	public static function tracking_url(): ?string {
-		return self::published_page_url( (int) get_option( 'bsn_tracking_page_id' ) );
+		return self::page_url( 'tracking' );
 	}
 
 	/**
-	 * Returns and refunds policy page URL, when the client has published it.
+	 * Option holding each store information page's ID. About, Contact, Delivery and FAQ are created by
+	 * `wp bsn setup`; the other three are the pages WooCommerce and WordPress already point at.
 	 */
-	public static function returns_url(): ?string {
-		return self::published_page_url( (int) get_option( 'woocommerce_refund_returns_page_id' ) );
+	public const PAGE_OPTIONS = array(
+		'about'    => 'bsn_page_about',
+		'contact'  => 'bsn_page_contact',
+		'delivery' => 'bsn_page_delivery',
+		'faq'      => 'bsn_page_faq',
+		'tracking' => 'bsn_tracking_page_id',
+		'returns'  => 'woocommerce_refund_returns_page_id',
+		'privacy'  => 'wp_page_for_privacy_policy',
+		'terms'    => 'woocommerce_terms_page_id',
+	);
+
+	/**
+	 * URL of a store information page, only while it is published.
+	 *
+	 * @param string $key One of the keys of PAGE_OPTIONS.
+	 */
+	public static function page_url( string $key ): ?string {
+		$option = self::PAGE_OPTIONS[ $key ] ?? null;
+		return null === $option ? null : self::published_page_url( (int) get_option( $option ) );
+	}
+
+	/**
+	 * Shop contact details from WooCommerce settings. Empty values stay empty so patterns can show a
+	 * placeholder for whatever is missing.
+	 *
+	 * @return array{phone: string, whatsapp: string, email: string, address: string[]}
+	 */
+	public static function contact_details(): array {
+		$email    = trim( (string) get_option( 'bsn_shop_email' ) );
+		$whatsapp = preg_replace( '/\D+/', '', (string) get_option( 'bsn_shop_whatsapp' ) );
+		return array(
+			'phone'    => trim( (string) get_option( 'bsn_shop_phone' ) ),
+			// Only 977 plus a ten-digit mobile makes a working wa.me link; anything else shows the placeholder.
+			'whatsapp' => 1 === preg_match( '/^9779\d{9}\z/', (string) $whatsapp ) ? (string) $whatsapp : '',
+			'email'    => is_email( $email ) ? $email : '',
+			'address'  => self::address_lines(),
+		);
+	}
+
+	/**
+	 * The WooCommerce store address as display lines; empty unless a street or town is set (the country
+	 * alone is not an address).
+	 *
+	 * @return string[]
+	 */
+	private static function address_lines(): array {
+		$street = trim( (string) get_option( 'woocommerce_store_address' ) );
+		$more   = trim( (string) get_option( 'woocommerce_store_address_2' ) );
+		$city   = trim( (string) get_option( 'woocommerce_store_city' ) );
+		if ( '' === $street && '' === $city ) {
+			return array();
+		}
+		$postcode = trim( (string) get_option( 'woocommerce_store_postcode' ) );
+		$parts    = explode( ':', (string) get_option( 'woocommerce_default_country' ) );
+		$country  = $parts[0];
+		$state    = $parts[1] ?? '';
+		if ( function_exists( 'WC' ) && WC()->countries ) {
+			$states  = WC()->countries->get_states( $country );
+			$state   = is_array( $states ) && isset( $states[ $state ] ) ? $states[ $state ] : $state;
+			$country = WC()->countries->get_countries()[ $country ] ?? $country;
+		}
+		$lines = array( $street, $more, trim( $city . ' ' . $postcode ), $state, $country );
+		return array_values( array_filter( $lines, static fn( $line ) => '' !== trim( (string) $line ) ) );
+	}
+
+	/**
+	 * Serialises simple page content into blocks, escaping every string, so patterns stay readable and
+	 * translatable. Each item is an array: [ 'h2'|'h3'|'p'|'note', text ], [ 'p_html', trusted html ],
+	 * [ 'ul'|'ol', string[] ] or [ 'qa', question, answer ].
+	 *
+	 * @param array<int,array> $items Content items.
+	 */
+	public static function blocks( array $items ): string {
+		$out = array();
+		foreach ( $items as $item ) {
+			$type = $item[0];
+			switch ( $type ) {
+				case 'h2':
+				case 'h3':
+					$level = (int) substr( $type, 1 );
+					$out[] = '<!-- wp:heading {"level":' . $level . '} --><' . $type . ' class="wp-block-heading">' . esc_html( $item[1] ) . '</' . $type . '><!-- /wp:heading -->';
+					break;
+				case 'p':
+					$out[] = '<!-- wp:paragraph --><p>' . esc_html( $item[1] ) . '</p><!-- /wp:paragraph -->';
+					break;
+				case 'note':
+					$out[] = '<!-- wp:paragraph {"className":"bsn-placeholder"} --><p class="bsn-placeholder">' . esc_html( $item[1] ) . '</p><!-- /wp:paragraph -->';
+					break;
+				case 'p_html':
+					$out[] = '<!-- wp:paragraph --><p>' . wp_kses_post( $item[1] ) . '</p><!-- /wp:paragraph -->';
+					break;
+				case 'ul':
+				case 'ol':
+					$list = '';
+					foreach ( $item[1] as $li ) {
+						$list .= '<!-- wp:list-item --><li>' . wp_kses_post( $li ) . '</li><!-- /wp:list-item -->';
+					}
+					$attrs = 'ol' === $type ? ' {"ordered":true}' : '';
+					$out[] = '<!-- wp:list' . $attrs . ' --><' . $type . ' class="wp-block-list">' . $list . '</' . $type . '><!-- /wp:list -->';
+					break;
+				case 'qa':
+					$out[] = '<!-- wp:details {"className":"bsn-faq"} --><details class="wp-block-details bsn-faq"><summary>' . esc_html( $item[1] ) . '</summary><!-- wp:paragraph --><p>' . wp_kses_post( $item[2] ) . '</p><!-- /wp:paragraph --></details><!-- /wp:details -->';
+					break;
+			}
+		}
+		return implode( "\n\n", $out );
+	}
+
+	/**
+	 * A link as safe HTML for use inside a sentence, or the plain label when the page is not published.
+	 *
+	 * @param string $key   Page key from PAGE_OPTIONS.
+	 * @param string $label Link text.
+	 */
+	public static function page_link( string $key, string $label ): string {
+		$url = self::page_url( $key );
+		return null === $url ? esc_html( $label ) : '<a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a>';
 	}
 
 	/**
@@ -602,6 +791,7 @@ final class Theme {
 	 *     @type int    $heading_level Card title heading level.
 	 *     @type bool   $pagination    Whether to render pagination and the no-results message.
 	 *     @type string $class         Extra class.
+	 *     @type string $slider        Slider key (see slider_labels()); when set the row is a horizontal slider.
 	 * }
 	 */
 	public static function collection_markup( array $args ): string {
@@ -613,6 +803,7 @@ final class Theme {
 				'heading_level' => 3,
 				'pagination'    => false,
 				'class'         => '',
+				'slider'        => '',
 			),
 			$args
 		);
@@ -637,7 +828,8 @@ final class Theme {
 			),
 			$args['query']
 		);
-		$class = trim( 'bsn-products ' . $args['class'] );
+		$slider = isset( self::slider_labels()[ $args['slider'] ] ) ? (string) $args['slider'] : '';
+		$class  = implode( ' ', array_filter( array( 'bsn-products', $args['class'], '' !== $slider ? 'bsn-slider bsn-slider--' . $slider : '' ) ) );
 		$attrs = array(
 			'queryId'              => (int) $args['query_id'],
 			'query'                => $query,

@@ -13,6 +13,7 @@ Contents:
 5. [Create a discount code](#5-create-a-discount-code)
 6. [Change the featured books on the home page](#6-change-the-featured-books-on-the-home-page)
 7. [Change delivery rates](#7-change-delivery-rates)
+8. [Shop information pages](#8-shop-information-pages)
 
 ---
 
@@ -102,9 +103,24 @@ To change many orders at once: on the **WooCommerce › Orders** list, tick the 
 
 **eSewa orders.** The order moves to **Processing** by itself once eSewa confirms the payment. If a customer started paying but never finished, the order stays on **Pending payment** (or becomes **Failed** if they cancelled on the eSewa page). The customer can place a new order and choose cash on delivery instead.
 
-Before you cancel such an order or put its books back into stock, log in to the **eSewa merchant portal** and search for a transaction for that order (the order number and amount). The website cannot yet check this for you. If eSewa shows the money was received, treat the order as paid: set it to **Processing** and pack it, or refund the customer from the eSewa portal. Only cancel the order if eSewa shows no completed payment.
+**Automatic eSewa check.** Some customers pay on eSewa but close the tab before they come back to the site. Every 5 minutes the website asks eSewa about unpaid eSewa orders placed between 10 minutes and 48 hours ago, including every earlier payment attempt on the same order. If eSewa says one was paid, the order moves to **Processing** by itself (stock is reduced and the confirmation email goes out, once). The website also asks eSewa before it cancels an unpaid eSewa order for being too old, so a paid order is not cancelled. For paid eSewa orders where the customer tried more than once, it also checks the other attempts, in case the customer paid twice. The order notes tell you what happened:
 
-If an order has a note starting "eSewa reported a successful payment for this order after it was switched to another payment method", the customer probably paid with eSewa and then changed the order to cash on delivery. Look up the transaction in the eSewa merchant portal using the transaction UUID in the note, and refund the eSewa payment (or collect no cash on delivery) so the customer does not pay twice.
+| Note starts with | What it means | What to do |
+|---|---|---|
+| "Payment confirmed by eSewa status check (customer did not return to the site)" | eSewa confirmed the payment after the customer left. The note has eSewa's reference. | Nothing. Pack it like any paid order. |
+| "Automatic eSewa payment check for transaction … returned NOT_FOUND" (or CANCELED) | eSewa has no completed payment for that attempt. | Nothing. Customer did not pay. The order is cancelled automatically later, or the customer pays again. |
+| "Automatic eSewa payment check for transaction … FULL_REFUND" | The payment was refunded in full in eSewa. | Check the eSewa merchant portal if you did not expect a refund. |
+| "Automatic eSewa payment check for transaction … PARTIAL_REFUND. eSewa still holds part of this payment" | Only part of the payment was refunded; eSewa still holds the rest. The order may still be cancelled automatically. | Check the eSewa merchant portal, then refund the rest or complete the order by hand. |
+| "Automatic eSewa payment check … amount mismatch" | eSewa has a completed payment, but for a different amount than the order total (for example, the order was edited after payment). **The order is never cancelled automatically.** | Compare the amounts in the eSewa merchant portal, then set the order to **Processing**, refund the difference, or refund and cancel it. |
+| "eSewa took a second payment for this order — refund ref … in the eSewa merchant portal" | The order is paid, but the customer also paid on another attempt (for example, they paid, lost the page and paid again). | Find the reference (and the transaction UUID in the note) in the eSewa merchant portal and refund that second payment. Keep the order as it is. |
+
+An eSewa order that has no note yet may simply be waiting: eSewa said "pending", or could not be reached, and the website will ask again in 5 minutes.
+
+**Orders the website will never cancel by itself.** An unpaid eSewa order that eSewa still reports as **pending**, and an order with an "amount mismatch" note, stay on **Pending payment** (their books stay reserved) until you act. After 48 hours the website stops checking them. Check the transaction in the eSewa merchant portal and either complete the order (set it to **Processing**) or cancel it (and refund in eSewa if money was taken).
+
+For an unpaid eSewa order **older than 48 hours**, the website has stopped checking. Before you cancel such an order or put its books back into stock, log in to the **eSewa merchant portal** and search for a transaction for that order (the order number and amount). If eSewa shows the money was received, treat the order as paid: set it to **Processing** and pack it, or refund the customer from the eSewa portal. Only cancel the order if eSewa shows no completed payment.
+
+If an order has a note starting "eSewa reported a successful payment for this order after it was switched to another payment method", the customer paid with eSewa and then changed the order to cash on delivery (the note ends "signed by eSewa" or "confirmed by eSewa status check" when eSewa itself reported it). Look up the transaction in the eSewa merchant portal using the transaction UUID in the note, and refund the eSewa payment (or collect no cash on delivery) so the customer does not pay twice. The website adds this note once per payment.
 
 **Customers can track their order** on the "Track your order" page of the website, using their order number and email.
 
@@ -159,6 +175,29 @@ Always check the result by adding a book to the cart on your website and going t
 When an order qualifies for free delivery, the checkout offers **Free delivery** and hides the paid **Delivery** option. Any other option you add to the zone, such as local pickup, still shows. Orders below the amount see the paid **Delivery** price instead.
 
 ![Shipping zones](admin-guide/07-shipping.png)
+
+## 8. Shop information pages
+
+Your shop has seven information pages: **About us**, **Contact us**, **Delivery information**, **Returns & refunds**, **Privacy policy**, **Terms & conditions** and **Frequently asked questions**. The footer links to them, and the checkout links to the Terms page.
+
+**Contact details.** Your phone, WhatsApp number, email and address are entered once and shown on the Contact page and in the footer.
+
+1. Go to **WooCommerce › Settings › General**.
+2. Fill in the **Store address** (street, city, district).
+3. Just below it, fill in **Shop phone**, **WhatsApp number** (a Nepali mobile such as `9812345678`; the 977 country code is added for you) and **Contact email**. The WordPress administrator email is never shown to customers; until you fill in the contact email, the footer shows a placeholder.
+4. Click **Save changes**.
+
+Anything you have not filled in shows as a bracketed `[CLIENT ...]` note, so gaps are easy to spot. Search your live site for "CLIENT" before you launch.
+
+**Changing the wording.** Each page's text comes from the theme, so it is translatable and the delivery charges stay up to date by themselves. To rewrite a page:
+
+1. Go to **Pages** and open the page.
+2. Click the text once, then click the three-dot menu in the block toolbar and choose **Detach**. (The page is a single "pattern" block.)
+3. Edit the text like any other page and click **Update**.
+
+A detached page no longer follows theme updates. On the Delivery page the live charges are a separate block, so they keep updating after you detach the page: leave that block in place. Pages you have published or edited are never overwritten when `wp bsn setup` is run again.
+
+**Review before launch.** The Privacy policy, Terms & conditions and Returns & refunds pages are drafts of ordinary wording, not legal advice. Fill in every `[CLIENT ...]` item (return period, refund timing, VAT, how long you keep records) and have them read by the shop owner and, ideally, a lawyer before the shop goes live.
 
 ---
 
