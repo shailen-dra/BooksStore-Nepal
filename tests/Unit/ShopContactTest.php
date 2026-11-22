@@ -24,10 +24,11 @@ class ShopContactTest extends WP_UnitTestCase {
 		$this->assertGreaterThan( array_search( ShopContact::EMAIL, $ids, true ), $end );
 	}
 
-	public function test_email_field_defaults_to_the_admin_email(): void {
+	public function test_email_field_defaults_to_empty_not_the_admin_email(): void {
 		foreach ( $this->fields() as $field ) {
 			if ( ShopContact::EMAIL === ( $field['id'] ?? '' ) ) {
-				$this->assertSame( get_option( 'admin_email' ), $field['default'] );
+				$this->assertSame( '', $field['default'] );
+				$this->assertStringNotContainsString( 'Leave empty', $field['desc'] );
 				return;
 			}
 		}
@@ -44,9 +45,17 @@ class ShopContactTest extends WP_UnitTestCase {
 		$this->assertSame( '', ShopContact::sanitize_phone( array( 'x' ) ) );
 	}
 
-	public function test_whatsapp_is_digits_only(): void {
+	public function test_whatsapp_is_normalised_to_country_code_plus_mobile(): void {
 		$this->assertSame( '9779812345678', ShopContact::sanitize_whatsapp( '+977 98-1234 5678' ) );
-		$this->assertSame( '', ShopContact::sanitize_whatsapp( 'call me' ) );
+		$this->assertSame( '9779812345678', ShopContact::sanitize_whatsapp( '9812345678' ) );
+		$this->assertSame( '9779812345678', ShopContact::sanitize_whatsapp( '00977 9812345678' ) );
+		$this->assertSame( '', ShopContact::sanitize_whatsapp( '' ) );
+	}
+
+	public function test_whatsapp_of_the_wrong_shape_is_rejected(): void {
+		foreach ( array( 'call me', '98123', '014123456', '97798123', '97798123456789', '8812345678' ) as $bad ) {
+			$this->assertSame( '', ShopContact::sanitize_whatsapp( $bad ), $bad );
+		}
 	}
 
 	public function test_email_must_be_valid(): void {

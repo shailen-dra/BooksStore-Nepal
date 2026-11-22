@@ -51,7 +51,7 @@ class ShopContact {
 			),
 			array(
 				'title'       => __( 'WhatsApp number', 'bookstore-nepal' ),
-				'desc'        => __( 'Digits only, with the country code, e.g. 97798XXXXXXXX. Customers get a "Chat on WhatsApp" link.', 'bookstore-nepal' ),
+				'desc'        => __( 'A Nepali mobile number, e.g. 9812345678 (977 is added for you) or 9779812345678. Customers get a "Chat on WhatsApp" link.', 'bookstore-nepal' ),
 				'id'          => self::WHATSAPP,
 				'type'        => 'text',
 				'default'     => '',
@@ -60,10 +60,10 @@ class ShopContact {
 			),
 			array(
 				'title'    => __( 'Contact email', 'bookstore-nepal' ),
-				'desc'     => __( 'Shown to customers on the Contact page and in the footer. Leave empty to use the site admin email.', 'bookstore-nepal' ),
+				'desc'     => __( 'Shown to customers on the Contact page and in the footer. Until you set it, the footer shows a placeholder; the site admin email is never shown.', 'bookstore-nepal' ),
 				'id'       => self::EMAIL,
 				'type'     => 'email',
-				'default'  => (string) get_option( 'admin_email' ),
+				'default'  => '',
 				'desc_tip' => true,
 			),
 		);
@@ -91,12 +91,37 @@ class ShopContact {
 	}
 
 	/**
-	 * Digits only, so the value drops straight into https://wa.me/<digits>.
+	 * A Nepali mobile number ready for https://wa.me/<number>: 977 followed by the ten-digit mobile
+	 * number (which starts with 9). A bare ten-digit mobile gets 977 added; anything else becomes empty
+	 * and the settings page says so.
 	 *
 	 * @param mixed $value Submitted value.
 	 */
 	public static function sanitize_whatsapp( $value ): string {
-		return (string) preg_replace( '/\D+/', '', is_scalar( $value ) ? (string) $value : '' );
+		$digits = (string) preg_replace( '/\D+/', '', is_scalar( $value ) ? (string) $value : '' );
+		if ( '' === $digits ) {
+			return '';
+		}
+		$digits = (string) preg_replace( '/^00/', '', $digits );
+		if ( 1 === preg_match( '/^9\d{9}\z/', $digits ) ) {
+			return '977' . $digits;
+		}
+		if ( self::valid_whatsapp( $digits ) ) {
+			return $digits;
+		}
+		if ( class_exists( '\WC_Admin_Settings' ) ) {
+			\WC_Admin_Settings::add_error( __( 'WhatsApp number was not saved: use a Nepali mobile number, for example 9812345678 or 9779812345678.', 'bookstore-nepal' ) );
+		}
+		return '';
+	}
+
+	/**
+	 * Whether a stored WhatsApp number is 977 plus a ten-digit mobile number.
+	 *
+	 * @param string $digits Digits only.
+	 */
+	public static function valid_whatsapp( string $digits ): bool {
+		return 1 === preg_match( '/^9779\d{9}\z/', $digits );
 	}
 
 	/**

@@ -269,13 +269,12 @@ final class Theme {
 	 * @return array{phone: string, whatsapp: string, email: string, address: string[]}
 	 */
 	public static function contact_details(): array {
-		$email = trim( (string) get_option( 'bsn_shop_email' ) );
-		if ( '' === $email ) {
-			$email = trim( (string) get_option( 'admin_email' ) );
-		}
+		$email    = trim( (string) get_option( 'bsn_shop_email' ) );
+		$whatsapp = preg_replace( '/\D+/', '', (string) get_option( 'bsn_shop_whatsapp' ) );
 		return array(
 			'phone'    => trim( (string) get_option( 'bsn_shop_phone' ) ),
-			'whatsapp' => preg_replace( '/\D+/', '', (string) get_option( 'bsn_shop_whatsapp' ) ),
+			// Only 977 plus a ten-digit mobile makes a working wa.me link; anything else shows the placeholder.
+			'whatsapp' => 1 === preg_match( '/^9779\d{9}\z/', (string) $whatsapp ) ? (string) $whatsapp : '',
 			'email'    => is_email( $email ) ? $email : '',
 			'address'  => self::address_lines(),
 		);
