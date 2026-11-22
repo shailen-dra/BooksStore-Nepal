@@ -69,7 +69,7 @@ class EsewaReconciler {
 			return false;
 		}
 		$result = EsewaGateway::instance()->reconcile( $order->get_id() );
-		if ( $result['api_error'] ) {
+		if ( $result['api_down'] ) {
 			self::$api_unavailable = true;
 		}
 		$keep = array(
@@ -208,7 +208,7 @@ class EsewaReconciler {
 			}
 			$result = $gateway->reconcile( (int) $id );
 			++$checked;
-			if ( $result['api_error'] ) {
+			if ( $result['api_down'] ) {
 				self::$api_unavailable = true;
 			}
 			if ( 'stray' === $key || in_array( $result['outcome'], array( EsewaGateway::RECONCILE_RETRY, EsewaGateway::RECONCILE_UNPAID, EsewaGateway::RECONCILE_MISMATCH ), true ) ) {

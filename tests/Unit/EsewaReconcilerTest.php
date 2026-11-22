@@ -108,7 +108,7 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		$code   = $answer['code'] ?? 200;
 		return array(
 			'headers'  => array(),
-			'body'     => wp_json_encode(
+			'body'     => isset( $answer['raw'] ) ? $answer['raw'] : wp_json_encode(
 				array(
 					'product_code'     => $answer['product_code'] ?? 'EPAYTEST',
 					'transaction_uuid' => $uuid,
@@ -570,6 +570,71 @@ class EsewaReconcilerTest extends WP_UnitTestCase {
 		$this->statuses[ $this->uuid( $order ) ] = 'PENDING';
 		$this->assertFalse( $this->should_cancel( $order ), 'PENDING: not cancelled now.' );
 		$this->assert_untouched( $order, $notes );
+	}
+
+	public function test_auto_cancel_server_error_stops_further_requests(): void {
+		$first = $this->order( 90 );
+		$this->statuses[ $this->uuid( $first ) ] = array(
+			'status' => 'COMPLETE',
+			'code'   => 503,
+		);
+		$this->assertFalse( $this->should_cancel( $first ) );
+		$second = $this->order( 90 );
+		$this->statuses[ $this->uuid( $second ) ] = 'NOT_FOUND';
+		$this->assertFalse( $this->should_cancel( $second ), '5xx: eSewa is down, nothing is cancelled this time.' );
+		$this->assertCount( 1, $this->requested );
+	}
+
+	/**
+	 * Answers eSewa might give about one bad transaction while the API itself works.
+	 */
+	public function bad_answers(): array {
+		return array(
+			'HTTP 400'     => array( array( 'status' => 'NOT_FOUND', 'code' => 400 ) ),
+			'HTTP 404'     => array( array( 'status' => 'NOT_FOUND', 'code' => 404 ) ),
+			'empty status' => array( '' ),
+			'unreadable'   => array(
+				array(
+					'status' => '',
+					'raw'    => '<html>Bad gateway page</html>',
+				),
+			),
+		);
+	}
+
+	/**
+	 * @dataProvider bad_answers
+	 */
+	public function test_auto_cancel_bad_answer_for_one_order_does_not_block_the_others( $answer ): void {
+		$bad   = $this->order( 90 );
+		$notes = $this->note_texts( $bad );
+		$this->statuses[ $this->uuid( $bad ) ] = $answer;
+		$this->assertFalse( $this->should_cancel( $bad ), 'That order is not cancelled now.' );
+		$this->assert_untouched( $bad, $notes );
+
+		$good = $this->order( 90 );
+		$this->statuses[ $this->uuid( $good ) ] = 'NOT_FOUND';
+		$this->assertTrue( $this->should_cancel( $good ), 'The next order is still checked.' );
+		$this->assertCount( 2, $this->requested );
+	}
+
+	/**
+	 * @dataProvider bad_answers
+	 */
+	public function test_bad_answer_for_one_transaction_does_not_stop_the_run( $answer ): void {
+		$first   = $this->order( 30 );
+		$earlier = $first->get_id() . '-1700000000';
+		$first   = $this->add_earlier_attempt( $first, $earlier );
+		$second  = $this->order( 20 );
+		$this->statuses[ $this->uuid( $first ) ]  = $answer;
+		$this->statuses[ $earlier ]               = 'NOT_FOUND';
+		$this->statuses[ $this->uuid( $second ) ] = 'COMPLETE';
+
+		EsewaReconciler::run();
+
+		$this->assertContains( $earlier, $this->requested, 'The order\'s other transactions are still checked.' );
+		$this->assertSame( 'processing', $this->fresh( $second )->get_status(), 'Later orders are still checked.' );
+		$this->assertSame( 'pending', $this->fresh( $first )->get_status() );
 	}
 
 	public function test_auto_cancel_goes_ahead_when_esewa_has_no_payment(): void {

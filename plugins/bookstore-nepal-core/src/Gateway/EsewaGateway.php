@@ -647,9 +647,11 @@ class EsewaGateway extends WC_Payment_Gateway {
 	 *
 	 * @param string $uuid   Transaction UUID.
 	 * @param string $amount Amount the transaction was started with.
-	 * @return array{outcome:string,status:string,message:string,ref_id:string,amount:mixed,api_error:bool}
-	 *         outcome: complete (UUID and product code match), retry (PENDING/AMBIGUOUS or the API
-	 *         failed; api_error says which), unpaid (any other status) or mismatch (another transaction).
+	 * @return array{outcome:string,status:string,message:string,ref_id:string,amount:mixed,failed:bool,api_down:bool}
+	 *         outcome: complete (UUID and product code match), retry (PENDING/AMBIGUOUS/no status, or
+	 *         the request failed), unpaid (any other status) or mismatch (another transaction).
+	 *         failed: no usable answer. api_down: transport failure or 5xx, i.e. eSewa itself is
+	 *         unreachable (a 4xx or malformed answer concerns only this transaction).
 	 */
 	private function check_status( string $uuid, string $amount ): array {
 		$result   = array(
@@ -658,7 +660,8 @@ class EsewaGateway extends WC_Payment_Gateway {
 			'message'   => '',
 			'ref_id'    => '',
 			'amount'    => null,
-			'api_error' => true,
+			'failed'    => true,
+			'api_down'  => true,
 		);
 		$url      = add_query_arg(
 			array(
@@ -677,7 +680,8 @@ class EsewaGateway extends WC_Payment_Gateway {
 			);
 			return $result;
 		}
-		$code = (int) wp_remote_retrieve_response_code( $response );
+		$code               = (int) wp_remote_retrieve_response_code( $response );
+		$result['api_down'] = $code >= 500;
 		if ( 200 !== $code ) {
 			$result['message'] = sprintf(
 				/* translators: %d: HTTP status code. */
@@ -691,9 +695,9 @@ class EsewaGateway extends WC_Payment_Gateway {
 			$result['message'] = __( 'eSewa status check failed: unreadable response. Payment not confirmed.', 'bookstore-nepal' );
 			return $result;
 		}
-		$result['api_error'] = false;
-		$status              = is_scalar( $body['status'] ?? null ) ? sanitize_text_field( (string) $body['status'] ) : '';
-		$result['status']    = $status;
+		$result['failed'] = false;
+		$status           = is_scalar( $body['status'] ?? null ) ? sanitize_text_field( (string) $body['status'] ) : '';
+		$result['status'] = $status;
 		if ( 'COMPLETE' !== $status ) {
 			$result['outcome'] = '' === $status || in_array( $status, self::OPEN_STATUSES, true ) ? self::CHECK_RETRY : self::CHECK_UNPAID;
 			$result['message'] = sprintf(
@@ -778,13 +782,13 @@ class EsewaGateway extends WC_Payment_Gateway {
 	 * under the order lock on a fresh copy, like the callback, so the two never both complete it.
 	 *
 	 * @param int $order_id Order ID.
-	 * @return array{outcome:string,api_error:bool} outcome: a RECONCILE_* value; api_error: the
-	 *         status API failed (callers stop calling it for now).
+	 * @return array{outcome:string,api_down:bool} outcome: a RECONCILE_* value; api_down: eSewa's
+	 *         status API is unreachable (callers stop calling it for now).
 	 */
 	public function reconcile( int $order_id ): array {
 		$result = array(
 			'outcome'   => self::RECONCILE_SKIPPED,
-			'api_error' => false,
+			'api_down'  => false,
 		);
 		$order  = $this->reload_order( $order_id );
 		if ( null === $order || '' === $this->product_code() ) {
@@ -814,10 +818,12 @@ class EsewaGateway extends WC_Payment_Gateway {
 				$complete = $uuid;
 				break;
 			}
-			if ( $check['api_error'] ) {
+			if ( $check['failed'] ) {
 				error_log( sprintf( 'Bookstore Nepal eSewa: automatic check of order %d (transaction %s) failed: %s', $order_id, $uuid, $check['message'] ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-				$result['api_error'] = true;
-				break;
+			}
+			if ( $check['api_down'] ) {
+				$result['api_down'] = true;
+				break; // Unreachable: don't wait on it for the other transactions.
 			}
 		}
 		if ( ! $checks ) {
