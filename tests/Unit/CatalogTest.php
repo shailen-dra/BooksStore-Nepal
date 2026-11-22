@@ -207,6 +207,27 @@ class CatalogTest extends WP_UnitTestCase {
 		$this->assertSame( array(), $this->search_ids( 'Mira Rai' ) );
 	}
 
+	public function test_product_search_matches_author_alongside_other_words(): void {
+		$poems   = $this->book_by( 'Poems for Children', 'Laxmi Prasad Devkota' );
+		$stories = $this->book_by( 'Muna Madan', 'Laxmi Prasad Devkota' );
+		$other   = $this->book_by( 'Poems of the Hills', 'Someone Else' );
+		$found   = $this->search_ids( 'Devkota poems' );
+		$this->assertContains( $poems, $found );
+		$this->assertNotContains( $other, $found, 'Every word must match the author, title or description.' );
+		$this->assertNotContains( $stories, $found );
+		$this->assertContains( $poems, $this->search_ids( 'Laxmi Devkota' ), 'Author words need not be adjacent.' );
+		$this->assertContains( $stories, $this->search_ids( 'Devkota -poems' ) );
+		$this->assertNotContains( $poems, $this->search_ids( 'Devkota -poems' ), 'Excluded words still exclude.' );
+	}
+
+	public function test_product_search_matches_devanagari_author_alongside_other_words(): void {
+		$poems = $this->book_by( 'बालबालिकाका कविता', 'लक्ष्मीप्रसाद देवकोटा' );
+		$other = $this->book_by( 'पहाडका कविता', 'अर्को लेखक' );
+		$found = $this->search_ids( 'देवकोटा कविता' );
+		$this->assertContains( $poems, $found );
+		$this->assertNotContains( $other, $found );
+	}
+
 	public function test_author_search_escapes_like_wildcards_and_quotes(): void {
 		$id = $this->book_by( 'Irish Tales', "Siobhan O'Brien" );
 		$this->assertContains( $id, $this->search_ids( "O'Brien" ) );

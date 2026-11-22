@@ -61,7 +61,9 @@ class Catalog {
 	 * Lets front-end product searches match the author field as well as title and description.
 	 *
 	 * The whole search phrase is matched against the author, so "Devkota" finds
-	 * "Laxmi Prasad Devkota" and "Mira Rai" finds "Mira Rai".
+	 * "Laxmi Prasad Devkota" and "Mira Rai" finds "Mira Rai". Each word WordPress parsed from the
+	 * search may also match the author instead of the title or description, so "Devkota poems"
+	 * finds a book of poems by Devkota. Excluded words ("-poems") still exclude.
 	 *
 	 * @param string    $search Search SQL from WP_Query (starts with " AND (").
 	 * @param \WP_Query $query  The query.
@@ -80,21 +82,76 @@ class Catalog {
 			return $search;
 		}
 		global $wpdb;
-		$exists = $wpdb->prepare(
-			"EXISTS ( SELECT 1 FROM {$wpdb->postmeta} bsn_author WHERE bsn_author.post_id = {$wpdb->posts}.ID AND bsn_author.meta_key = %s AND bsn_author.meta_value LIKE %s ) OR ",
-			self::META_AUTHOR,
-			'%' . $wpdb->esc_like( $phrase ) . '%'
-		);
-		// WP_Query wraps the term clauses as " AND ( ... ) "; OR the author check into that group.
+		$extra = self::author_exists( '%' . $wpdb->esc_like( $phrase ) . '%' ) . ' OR ';
+		$terms = self::author_terms_clause( $query, $phrase );
+		if ( '' !== $terms ) {
+			$extra .= $terms . ' OR ';
+		}
+		// WP_Query wraps the term clauses as " AND ( ... ) "; OR the author checks into that group.
 		$result = preg_replace_callback(
 			'/^\s*AND\s*\(/',
-			static function () use ( $exists ): string {
-				return ' AND ( ' . $exists;
+			static function () use ( $extra ): string {
+				return ' AND ( ' . $extra;
 			},
 			$search,
 			1
 		);
 		return null === $result ? $search : $result;
+	}
+
+	/**
+	 * SQL that is true when the product's author matches a LIKE pattern.
+	 *
+	 * @param string $like Escaped LIKE pattern.
+	 * @return string
+	 */
+	private static function author_exists( string $like ): string {
+		global $wpdb;
+		return $wpdb->prepare(
+			"EXISTS ( SELECT 1 FROM {$wpdb->postmeta} bsn_author WHERE bsn_author.post_id = {$wpdb->posts}.ID AND bsn_author.meta_key = %s AND bsn_author.meta_value LIKE %s )",
+			self::META_AUTHOR,
+			$like
+		);
+	}
+
+	/**
+	 * Mirrors WordPress's per-word search, letting each word match the author too.
+	 *
+	 * @param \WP_Query $query  The query, after WordPress parsed its search terms.
+	 * @param string    $phrase The trimmed search phrase.
+	 * @return string SQL, or empty string when there is nothing beyond the whole-phrase match.
+	 */
+	private static function author_terms_clause( \WP_Query $query, string $phrase ): string {
+		global $wpdb;
+		$terms = array_values( array_filter( array_map( 'strval', (array) $query->get( 'search_terms' ) ), 'strlen' ) );
+		if ( ! $terms || array( $phrase ) === $terms ) {
+			return '';
+		}
+		$allowed = array( 'post_title', 'post_excerpt', 'post_content' );
+		$columns = array_values( array_intersect( (array) $query->get( 'search_columns' ), $allowed ) );
+		$columns = $columns ? $columns : $allowed;
+		$wild    = $query->get( 'exact' ) ? '' : '%';
+		/** This filter is documented in wp-includes/class-wp-query.php */
+		$prefix = apply_filters( 'wp_query_search_exclusion_prefix', '-' );
+		$parts  = array();
+		foreach ( $terms as $term ) {
+			$exclude = $prefix && str_starts_with( $term, $prefix );
+			if ( $exclude ) {
+				$term = substr( $term, strlen( $prefix ) );
+				if ( '' === $term ) {
+					continue;
+				}
+			}
+			$like    = $wild . $wpdb->esc_like( $term ) . $wild;
+			$matches = array();
+			foreach ( $columns as $column ) {
+				$matches[] = $wpdb->prepare( "{$wpdb->posts}.{$column} LIKE %s", $like ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- column is from an allow-list.
+			}
+			$parts[] = $exclude
+				? 'NOT ( ' . implode( ' OR ', $matches ) . ' )'
+				: '( ' . self::author_exists( $like ) . ' OR ' . implode( ' OR ', $matches ) . ' )';
+		}
+		return $parts ? '( ' . implode( ' AND ', $parts ) . ' )' : '';
 	}
 
 	/**
