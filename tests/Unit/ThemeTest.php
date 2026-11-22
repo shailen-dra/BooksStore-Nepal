@@ -419,6 +419,13 @@ class ThemeTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_templates_with_add_to_cart_buttons_show_store_notices(): void {
+		$theme = dirname( __DIR__, 2 ) . '/themes/bookstore-nepal';
+		$this->assertStringContainsString( '<!-- wp:woocommerce/store-notices', (string) file_get_contents( $theme . '/templates/front-page.html' ) );
+		$this->assertStringContainsString( '<!-- wp:woocommerce/store-notices', (string) file_get_contents( $theme . '/templates/single-product.html' ) );
+		$this->assertStringContainsString( '<!-- wp:woocommerce/store-notices', (string) file_get_contents( $theme . '/patterns/shop-results.php' ) );
+	}
+
 	public function test_footer_uses_payments_pattern_not_static_copy(): void {
 		$footer = (string) file_get_contents( dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/parts/footer.html' );
 		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"bookstore-nepal/footer-payments"} /-->', $footer );
