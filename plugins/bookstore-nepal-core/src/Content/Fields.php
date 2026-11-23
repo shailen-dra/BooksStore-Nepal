@@ -161,17 +161,16 @@ class Fields {
 		if ( ! function_exists( 'acf_add_local_field_group' ) ) {
 			return;
 		}
+		// Every group is registered, even when its page does not exist yet: ACF only reads and writes
+		// fields it knows (an unknown repeater is saved in a shape it cannot load back).
 		foreach ( array_keys( self::schema() ) as $key ) {
-			$group = self::acf_group( $key );
-			if ( $group['location'] ) {
-				acf_add_local_field_group( $group );
-			}
+			acf_add_local_field_group( self::acf_group( $key ) );
 		}
 	}
 
 	/**
-	 * The array handed to acf_add_local_field_group() for one group; `location` is empty when the
-	 * group's page is not set up.
+	 * The array handed to acf_add_local_field_group() for one group. A store page that is not set up
+	 * yet gets a rule matching no screen (page 0).
 	 *
 	 * @param string $key Group key from schema().
 	 * @return array<string,mixed>
@@ -203,7 +202,7 @@ class Fields {
 			return array( array( array( 'param' => 'options_page', 'operator' => '==', 'value' => self::OPTIONS_SLUG ) ) );
 		}
 		$id = Content::post_id_for( $location );
-		return is_int( $id ) ? array( array( array( 'param' => 'page', 'operator' => '==', 'value' => (string) $id ) ) ) : array();
+		return array( array( array( 'param' => 'page', 'operator' => '==', 'value' => (string) ( is_int( $id ) ? $id : 0 ) ) ) );
 	}
 
 	/**

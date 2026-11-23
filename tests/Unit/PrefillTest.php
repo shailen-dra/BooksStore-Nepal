@@ -125,6 +125,13 @@ class PrefillTest extends WP_UnitTestCase {
 		$this->assertNull( get_field( 'bsn_faq_intro', $this->ids['faq'] ) );
 	}
 
+	public function test_run_registers_field_groups_for_pages_created_after_acf_init(): void {
+		$GLOBALS['bsn_acf_registered'] = array( 'groups' => array(), 'pages' => array() );
+		Prefill::run();
+		$groups = array_column( $GLOBALS['bsn_acf_registered']['groups'], null, 'key' );
+		$this->assertSame( (string) $this->ids['faq'], $groups['group_bsn_faq']['location'][0][0]['value'] );
+	}
+
 	public function test_registers_on_acf_init(): void {
 		Prefill::register();
 		$this->assertSame( 20, has_action( 'acf/init', array( Prefill::class, 'maybe_run' ) ) );

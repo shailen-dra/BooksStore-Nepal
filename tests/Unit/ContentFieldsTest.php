@@ -54,12 +54,14 @@ class ContentFieldsTest extends WP_UnitTestCase {
 		$this->assertSame( 'bsn-shop-settings', $rule['value'] );
 	}
 
-	public function test_unresolved_store_page_group_is_skipped(): void {
+	public function test_unresolved_store_page_group_still_registers_its_fields(): void {
+		// ACF only reads and writes a field it knows; a fresh install creates the pages after acf/init.
 		update_option( StorePages::definitions()['terms']['option'], 0 );
 		Fields::register_groups();
-		$keys = wp_list_pluck( $GLOBALS['bsn_acf_registered']['groups'], 'key' );
-		$this->assertNotContains( 'group_bsn_terms', $keys );
-		$this->assertContains( 'group_bsn_about', $keys );
+		$groups = array_column( $GLOBALS['bsn_acf_registered']['groups'], null, 'key' );
+		$this->assertArrayHasKey( 'group_bsn_terms', $groups );
+		$this->assertSame( '0', $groups['group_bsn_terms']['location'][0][0]['value'], 'Shown on no screen until the page exists.' );
+		$this->assertSame( (string) $this->ids['about'], $groups['group_bsn_about']['location'][0][0]['value'] );
 	}
 
 	public function test_wysiwyg_fields_use_basic_toolbar_without_media(): void {

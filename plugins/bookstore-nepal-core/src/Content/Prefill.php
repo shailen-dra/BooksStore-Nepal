@@ -49,6 +49,9 @@ class Prefill {
 		if ( ! Content::acf_active() ) {
 			return 0;
 		}
+		// Pages may have been created since acf/init (e.g. by `wp bsn setup`): register again so every
+		// group points at its page before anything is written.
+		Fields::register_groups();
 		$defaults = (array) apply_filters( 'bsn_content_defaults', array() );
 		$written  = self::adopt_detached_pages();
 
