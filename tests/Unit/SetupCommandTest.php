@@ -60,6 +60,16 @@ class SetupCommandTest extends WP_UnitTestCase {
 		return $n;
 	}
 
+	public function test_setup_reports_wording_fill_only_with_acf(): void {
+		add_filter( 'bsn_acf_active', '__return_false' );
+		$command = new SetupCommand();
+		$command->run( array() );
+		$this->assertNull( $command->wording_filled(), 'No ACF: nothing filled, a warning is printed.' );
+		remove_all_filters( 'bsn_acf_active' );
+		$command->run( array() );
+		$this->assertIsInt( $command->wording_filled() );
+	}
+
 	public function test_setup_applies_store_options(): void {
 		$errors = ( new SetupCommand() )->run( array() );
 		$this->assertSame( array(), $errors );

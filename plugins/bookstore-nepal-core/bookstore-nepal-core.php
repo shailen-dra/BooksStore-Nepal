@@ -63,3 +63,4 @@ add_action( 'bsn_booted', array( \BookstoreNepal\Cli\SetupCommand::class, 'regis
 add_action( 'bsn_booted', array( \BookstoreNepal\GiftFinder::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\ShopContact::class, 'register' ) );
 add_action( 'bsn_booted', array( \BookstoreNepal\Content\Fields::class, 'register' ) );
+add_action( 'bsn_booted', array( \BookstoreNepal\Content\Prefill::class, 'register' ) );
