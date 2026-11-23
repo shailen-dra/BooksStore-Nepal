@@ -10,6 +10,7 @@
  */
 
 use BookstoreNepal\Theme\Theme;
+use BookstoreNepal\Theme\Wording;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -23,7 +24,7 @@ $bsn_links = array(
 ?>
 <!-- wp:group {"className":"bsn-footer__col","layout":{"type":"flex","orientation":"vertical"}} -->
 <div class="wp-block-group bsn-footer__col"><!-- wp:paragraph {"className":"bsn-footer__heading"} -->
-<p class="bsn-footer__heading"><strong><?php esc_html_e( 'Help', 'bookstore-nepal' ); ?></strong></p>
+<p class="bsn-footer__heading"><strong><?php echo esc_html( Wording::text( 'bsn_footer_help_heading' ) ); ?></strong></p>
 <!-- /wp:paragraph -->
 <?php foreach ( $bsn_links as $bsn_key => $bsn_label ) : ?>
 <?php $bsn_url = Theme::page_url( $bsn_key ); ?>

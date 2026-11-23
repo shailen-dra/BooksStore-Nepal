@@ -8,6 +8,8 @@
  * @package BookstoreNepal
  */
 
+use BookstoreNepal\Theme\Wording;
+
 defined( 'ABSPATH' ) || exit;
 
 $bsn_search = serialize_block_attributes(
@@ -26,31 +28,31 @@ $bsn_search = serialize_block_attributes(
 <!-- wp:group {"align":"wide","className":"bsn-hero","layout":{"type":"default"}} -->
 <div class="wp-block-group alignwide bsn-hero"><!-- wp:group {"className":"bsn-hero__text","layout":{"type":"default"}} -->
 <div class="wp-block-group bsn-hero__text"><!-- wp:paragraph {"className":"bsn-pill bsn-pill--mint"} -->
-<p class="bsn-pill bsn-pill--mint"><?php esc_html_e( 'Delivery all over Nepal', 'bookstore-nepal' ); ?></p>
+<p class="bsn-pill bsn-pill--mint"><?php echo esc_html( Wording::text( 'bsn_hero_pill' ) ); ?></p>
 <!-- /wp:paragraph -->
 
 <!-- wp:heading {"level":1} -->
-<h1 class="wp-block-heading"><?php esc_html_e( 'Books that grow with your child', 'bookstore-nepal' ); ?></h1>
+<h1 class="wp-block-heading"><?php echo esc_html( Wording::text( 'bsn_hero_headline' ) ); ?></h1>
 <!-- /wp:heading -->
 
 <!-- wp:paragraph {"className":"bsn-hero__lead"} -->
-<p class="bsn-hero__lead"><?php esc_html_e( 'Picture books, stories and activity books in Nepali and English — chosen by age, delivered to your door.', 'bookstore-nepal' ); ?></p>
+<p class="bsn-hero__lead"><?php echo esc_html( Wording::text( 'bsn_hero_lead' ) ); ?></p>
 <!-- /wp:paragraph -->
 
 <!-- wp:search <?php echo $bsn_search; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Block attributes JSON; the search block escapes them when rendering. ?> /-->
 
 <!-- wp:buttons {"className":"bsn-hero__actions"} -->
 <div class="wp-block-buttons bsn-hero__actions"><!-- wp:button -->
-<div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="#ages"><?php esc_html_e( 'Shop by age', 'bookstore-nepal' ); ?></a></div>
+<div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="#ages"><?php echo esc_html( Wording::text( 'bsn_hero_button_ages' ) ); ?></a></div>
 <!-- /wp:button -->
 
 <!-- wp:button {"className":"is-style-outline"} -->
-<div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="#gift"><?php esc_html_e( 'Find a gift', 'bookstore-nepal' ); ?></a></div>
+<div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="#gift"><?php echo esc_html( Wording::text( 'bsn_hero_button_gift' ) ); ?></a></div>
 <!-- /wp:button --></div>
 <!-- /wp:buttons --></div>
 <!-- /wp:group -->
 
 <!-- wp:html -->
-<div class="bsn-hero__books" aria-hidden="true"><span class="bsn-hero__book bsn-hero__book--1">The Little Yak's Big Day</span><span class="bsn-hero__book bsn-hero__book--2">हिमालको कथा</span><span class="bsn-hero__book bsn-hero__book--3">Count the Momos</span></div>
+<div class="bsn-hero__books" aria-hidden="true"><span class="bsn-hero__book bsn-hero__book--1"><?php echo esc_html( Wording::text( 'bsn_hero_book_1' ) ); ?></span><span class="bsn-hero__book bsn-hero__book--2"><?php echo esc_html( Wording::text( 'bsn_hero_book_2' ) ); ?></span><span class="bsn-hero__book bsn-hero__book--3"><?php echo esc_html( Wording::text( 'bsn_hero_book_3' ) ); ?></span></div>
 <!-- /wp:html --></div>
 <!-- /wp:group -->

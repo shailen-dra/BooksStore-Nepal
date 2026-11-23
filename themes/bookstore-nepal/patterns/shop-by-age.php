@@ -9,18 +9,19 @@
  */
 
 use BookstoreNepal\Theme\Theme;
+use BookstoreNepal\Theme\Wording;
 
 defined( 'ABSPATH' ) || exit;
 
 $bsn_tiles = array(
-	'0-3'  => array( 'rose', '0–3', __( 'Babies & toddlers', 'bookstore-nepal' ), __( 'Board books, first words, touch and feel', 'bookstore-nepal' ) ),
-	'4-7'  => array( 'mint', '4–7', __( 'Early readers', 'bookstore-nepal' ), __( 'Picture stories, alphabet and activity books', 'bookstore-nepal' ) ),
-	'8-12' => array( 'sky', '8–12', __( 'Confident readers', 'bookstore-nepal' ), __( 'Chapter books, adventures, how-things-work', 'bookstore-nepal' ) ),
+	'0-3'  => array( 'rose', '0–3', Wording::text( 'bsn_age_0_3_title' ), Wording::text( 'bsn_age_0_3_text' ) ),
+	'4-7'  => array( 'mint', '4–7', Wording::text( 'bsn_age_4_7_title' ), Wording::text( 'bsn_age_4_7_text' ) ),
+	'8-12' => array( 'sky', '8–12', Wording::text( 'bsn_age_8_12_title' ), Wording::text( 'bsn_age_8_12_text' ) ),
 );
 ?>
 <!-- wp:group {"align":"wide","anchor":"ages","className":"bsn-section bsn-ages","layout":{"type":"default"}} -->
 <div id="ages" class="wp-block-group alignwide bsn-section bsn-ages"><!-- wp:heading -->
-<h2 class="wp-block-heading"><?php esc_html_e( 'Shop by age', 'bookstore-nepal' ); ?></h2>
+<h2 class="wp-block-heading"><?php echo esc_html( Wording::text( 'bsn_ages_heading' ) ); ?></h2>
 <!-- /wp:heading -->
 
 <!-- wp:html -->
