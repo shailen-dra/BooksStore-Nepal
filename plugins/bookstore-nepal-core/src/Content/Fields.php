@@ -109,7 +109,7 @@ class Fields {
 						'sub_fields'   => array(
 							$text( 'heading', __( 'Heading above this question (optional)', 'bookstore-nepal' ), __( 'Starts a new group, e.g. "Choosing books".', 'bookstore-nepal' ) ),
 							$text( 'question', __( 'Question', 'bookstore-nepal' ) ),
-							$textarea( 'answer', __( 'Answer', 'bookstore-nepal' ) ),
+							$rich( 'answer', __( 'Answer', 'bookstore-nepal' ) ),
 						),
 					),
 				),

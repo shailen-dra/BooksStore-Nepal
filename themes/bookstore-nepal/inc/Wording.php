@@ -22,7 +22,7 @@ final class Wording {
 	 * @return array<string,string|array>
 	 */
 	public static function defaults( $defaults = array() ): array {
-		return array_merge( (array) $defaults, self::home(), self::settings() );
+		return array_merge( (array) $defaults, self::home(), self::settings(), self::pages() );
 	}
 
 	/**
@@ -31,7 +31,7 @@ final class Wording {
 	 * @param string $field Field name.
 	 */
 	public static function text( string $field ): string {
-		$default = self::defaults()[ $field ] ?? '';
+		$default = self::default_of( $field );
 		$default = is_string( $default ) ? $default : '';
 		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::text( $field, $default ) : $default;
 	}
@@ -42,7 +42,7 @@ final class Wording {
 	 * @param string $field Field name.
 	 */
 	public static function rich( string $field ): string {
-		$default = self::defaults()[ $field ] ?? '';
+		$default = self::default_of( $field );
 		$default = is_string( $default ) ? $default : '';
 		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::rich( $field, $default ) : wp_kses_post( wpautop( $default ) );
 	}
@@ -54,9 +54,35 @@ final class Wording {
 	 * @return list<array<string,string>>
 	 */
 	public static function rows( string $field ): array {
-		$default = self::defaults()[ $field ] ?? array();
+		$default = self::default_of( $field );
 		$default = is_array( $default ) ? $default : array();
 		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::rows( $field, $default ) : array_values( $default );
+	}
+
+	/**
+	 * One default; store-page defaults are only built when a store-page box is asked for.
+	 *
+	 * @param string $field Field name.
+	 * @return string|array
+	 */
+	private static function default_of( string $field ) {
+		$cheap = self::home() + self::settings();
+		return $cheap[ $field ] ?? ( self::pages()[ $field ] ?? '' );
+	}
+
+	/**
+	 * Store pages: rich boxes as HTML, FAQ rows as arrays (from inc/wording/<page>.php).
+	 *
+	 * @return array<string,string|array>
+	 */
+	private static function pages(): array {
+		$out = array();
+		foreach ( array( 'about', 'contact', 'delivery', 'returns', 'privacy', 'terms', 'faq' ) as $page ) {
+			foreach ( (array) include __DIR__ . '/wording/' . $page . '.php' as $field => $items ) {
+				$out[ $field ] = 'bsn_faq_items' === $field ? $items : Theme::html( $items );
+			}
+		}
+		return $out;
 	}
 
 	/**
