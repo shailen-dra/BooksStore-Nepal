@@ -127,13 +127,33 @@ class Content {
 	}
 
 	/**
-	 * IDs of the pages whose wording is edited through fields: the front page and every store page.
+	 * Whether a store page was rewritten in the block editor: its content is something other than its
+	 * pattern block, our placeholder paragraph, or nothing. Such a page shows its own blocks, not its boxes.
+	 *
+	 * @param string $key StorePages key.
+	 */
+	public static function is_detached( string $key ): bool {
+		$defs = StorePages::definitions();
+		$id   = self::post_id_for( 'page:' . $key );
+		if ( ! is_int( $id ) || ! isset( $defs[ $key ] ) ) {
+			return false;
+		}
+		$content = trim( (string) get_post_field( 'post_content', $id ) );
+		return ! in_array( $content, array( '', StorePages::pattern_block( $key ), StorePages::content( $key, $defs[ $key ]['title'] ) ), true );
+	}
+
+	/**
+	 * IDs of the pages whose wording is edited through fields: the front page and every store page that
+	 * still shows its boxes (not one rewritten in the block editor).
 	 *
 	 * @return list<int>
 	 */
 	public static function managed_page_ids(): array {
 		$ids = array();
 		foreach ( array_merge( array( 'front_page' ), array_map( static fn( $k ) => 'page:' . $k, array_keys( StorePages::definitions() ) ) ) as $location ) {
+			if ( str_starts_with( $location, 'page:' ) && self::is_detached( substr( $location, 5 ) ) ) {
+				continue;
+			}
 			$id = self::post_id_for( $location );
 			if ( is_int( $id ) ) {
 				$ids[] = $id;

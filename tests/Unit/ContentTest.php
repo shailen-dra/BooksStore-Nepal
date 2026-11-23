@@ -26,7 +26,7 @@ class ContentTest extends WP_UnitTestCase {
 	}
 
 	private function store_page( string $key, string $status = 'publish' ): int {
-		$id = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => $status ) );
+		$id = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => $status, 'post_content' => StorePages::pattern_block( $key ) ) );
 		update_option( StorePages::definitions()[ $key ]['option'], $id );
 		return $id;
 	}

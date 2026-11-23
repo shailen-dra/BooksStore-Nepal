@@ -16,7 +16,7 @@ class ContentFieldsTest extends WP_UnitTestCase {
 			'pages'  => array(),
 		);
 		foreach ( StorePages::definitions() as $key => $def ) {
-			$this->ids[ $key ] = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+			$this->ids[ $key ] = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_content' => StorePages::pattern_block( $key ) ) );
 			update_option( $def['option'], $this->ids[ $key ] );
 		}
 	}

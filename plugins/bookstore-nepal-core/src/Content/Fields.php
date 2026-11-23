@@ -202,7 +202,9 @@ class Fields {
 			return array( array( array( 'param' => 'options_page', 'operator' => '==', 'value' => self::OPTIONS_SLUG ) ) );
 		}
 		$id = Content::post_id_for( $location );
-		return array( array( array( 'param' => 'page', 'operator' => '==', 'value' => (string) ( is_int( $id ) ? $id : 0 ) ) ) );
+		// A page rewritten in the block editor shows its own blocks, so its boxes would do nothing: hide them.
+		$show = is_int( $id ) && ! Content::is_detached( substr( $location, 5 ) );
+		return array( array( array( 'param' => 'page', 'operator' => '==', 'value' => (string) ( $show ? $id : 0 ) ) ) );
 	}
 
 	/**

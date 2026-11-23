@@ -15,7 +15,7 @@ class EditorSwitchTest extends WP_UnitTestCase {
 		$this->front = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
 		update_option( 'show_on_front', 'page' );
 		update_option( 'page_on_front', $this->front );
-		$this->about = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+		$this->about = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_content' => StorePages::pattern_block( 'about' ) ) );
 		update_option( StorePages::definitions()['about']['option'], $this->about );
 	}
 
