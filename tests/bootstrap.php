@@ -57,6 +57,9 @@ tests_add_filter(
 	}
 );
 
+// ACF Pro is not installed in tests; these stand-ins behave like its storage.
+require __DIR__ . '/Support/acf-stubs.php';
+
 require $bsn_tests_dir . '/includes/bootstrap.php';
 
 require_once __DIR__ . '/Support/RestoresGlobalState.php';
