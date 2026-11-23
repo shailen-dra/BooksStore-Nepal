@@ -337,7 +337,12 @@ class EsewaGatewayTest extends WP_UnitTestCase {
 			$list[ $order->get_id() . '-' . ( 1700000000 + $i ) ] = '500';
 		}
 		$order->update_meta_data( EsewaGateway::META_UUIDS, $list );
+		// The current UUID is always the newest remembered one. Without this, the UUID order() minted stays
+		// outside the full list and is counted too, so the test failed whenever a new second began
+		// before the next process_payment().
+		$order->update_meta_data( EsewaGateway::META_UUID, (string) array_key_last( $list ) );
 		$order->save();
+		$this->assertCount( EsewaGateway::MAX_REMEMBERED_UUIDS, $this->gateway->remembered_uuids( $this->fresh( $order ) ), 'Starts exactly full.' );
 		$this->gateway->process_payment( $order->get_id() );
 
 		$order      = $this->fresh( $order );
