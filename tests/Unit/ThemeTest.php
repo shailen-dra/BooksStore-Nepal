@@ -607,13 +607,42 @@ class ThemeTest extends WP_UnitTestCase {
 	public function test_faq_pattern_uses_details_blocks_and_hides_disabled_payment_questions(): void {
 		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'no' );
 		$html = $this->render_pattern( 'page-faq' );
-		$this->assertGreaterThanOrEqual( 8, substr_count( $html, '<!-- wp:details' ) );
+		$this->assertGreaterThanOrEqual( 8, substr_count( $html, '<details class="wp-block-details bsn-faq">' ) );
 		$this->assertStringContainsString( 'Can I pay when the books arrive?', $html );
 		$this->assertStringContainsString( 'How does paying with eSewa work?', $html );
 		$this->payments( array( 'cod' => 'no', 'esewa' => 'no' ), 'no' );
 		$html = $this->render_pattern( 'page-faq' );
 		$this->assertStringNotContainsString( 'Can I pay when the books arrive?', $html );
 		$this->assertStringNotContainsString( 'eSewa work', $html );
+	}
+
+	public function test_faq_payment_questions_follow_gateways_even_after_the_owner_edits_the_list(): void {
+		require_once dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/inc/Wording.php';
+		$faq = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+		update_option( 'bsn_page_faq', $faq );
+		update_field(
+			'bsn_faq_items',
+			array(
+				array( 'heading' => 'Ordering', 'question' => 'Q1', 'answer' => 'A1' ),
+				array( 'heading' => 'Books', 'question' => 'Q2', 'answer' => 'A2' ),
+			),
+			$faq
+		);
+		$this->payments( array( 'cod' => 'yes', 'esewa' => 'yes' ), 'no' );
+		$html = $this->render_pattern( 'page-faq' );
+		$this->assertStringContainsString( 'Can I pay when the books arrive?', $html );
+		$this->assertStringContainsString( 'How does paying with eSewa work?', $html );
+		// At the end of the first group: after Q1, before the second heading.
+		$this->assertLessThan( strpos( $html, 'Can I pay when' ), strpos( $html, '<summary>Q1</summary>' ) );
+		$this->assertLessThan( strpos( $html, 'Books</h2>' ), strpos( $html, 'How does paying with eSewa work?' ) );
+
+		$this->payments( array( 'cod' => 'no', 'esewa' => 'no' ), 'no' );
+		$html = $this->render_pattern( 'page-faq' );
+		$this->assertStringNotContainsString( 'Can I pay when the books arrive?', $html );
+		$this->assertStringNotContainsString( 'eSewa work', $html );
+
+		$questions = wp_list_pluck( \BookstoreNepal\Theme\Wording::defaults()['bsn_faq_items'], 'question' );
+		$this->assertNotContains( 'Can I pay when the books arrive?', $questions, 'Payment questions are automatic, not owner text.' );
 	}
 
 	public function test_delivery_page_nests_the_live_rates_pattern_and_skips_unavailable_payment_text(): void {
@@ -664,7 +693,8 @@ class ThemeTest extends WP_UnitTestCase {
 	public function test_free_delivery_wording_is_inclusive(): void {
 		Shipping::install( array( 'valley' => 120, 'rest' => 250, 'free_over' => 3000 ) );
 		Theme::flush_rates();
-		foreach ( array( 'book-delivery', 'delivery-rates', 'page-faq' ) as $slug ) {
+		// The FAQ no longer quotes charges (they live in editable text and would go stale); it links to Delivery.
+		foreach ( array( 'book-delivery', 'delivery-rates' ) as $slug ) {
 			$html = $this->render_pattern( $slug );
 			$this->assertStringContainsString( 'NPR 3,000 or more', $html, $slug );
 			$this->assertStringNotContainsString( 'orders over', $html, $slug );

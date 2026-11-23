@@ -42,6 +42,13 @@ class SetupCommand {
 	private array $page_report = array();
 
 	/**
+	 * Wording boxes the last run filled, or null when ACF Pro was not active.
+	 *
+	 * @var int|null
+	 */
+	private ?int $wording_filled = null;
+
+	/**
 	 * Registers the command when WP-CLI is running.
 	 */
 	public static function register(): void {
@@ -88,6 +95,11 @@ class SetupCommand {
 		}
 		foreach ( $this->page_report as $key => $outcome ) {
 			\WP_CLI::log( sprintf( 'Page %s: %s', $key, $outcome ) );
+		}
+		if ( null === $this->wording_filled ) {
+			\WP_CLI::warning( 'ACF Pro is not active, so the wording fields were not filled. Install and activate ACF Pro, then run wp bsn setup again.' );
+		} else {
+			\WP_CLI::log( sprintf( 'Wording fields: %d filled', $this->wording_filled ) );
 		}
 		if ( $this->page_report && ! StorePages::pattern_available() ) {
 			\WP_CLI::warning( 'The Bookstore Nepal theme is not active, so the store information pages got a short placeholder paragraph instead of their text. Activate the theme, then delete those pages (or their stored IDs) and run setup again, or write the text in the page editor.' );
@@ -159,6 +171,8 @@ class SetupCommand {
 		$this->ensure_tracking_page();
 		// Structural like the tracking page, so it runs every time; it never touches a page the owner has published or edited.
 		$this->page_report = StorePages::ensure_all();
+		// Fill the wording boxes now that the pages exist (only with ACF Pro active; null means it was not).
+		$this->wording_filled = \BookstoreNepal\Content\Content::acf_active() ? \BookstoreNepal\Content\Prefill::run() : null;
 
 		$errors = array_merge( Catalog::install(), Shipping::seed( $rates ) );
 
@@ -167,6 +181,13 @@ class SetupCommand {
 		delete_option( 'rewrite_rules' );
 
 		return $errors;
+	}
+
+	/**
+	 * Boxes the last run() filled with default wording, or null when ACF Pro was not active.
+	 */
+	public function wording_filled(): ?int {
+		return $this->wording_filled;
 	}
 
 	/**

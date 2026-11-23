@@ -9,6 +9,7 @@
  */
 
 use BookstoreNepal\Theme\Theme;
+use BookstoreNepal\Theme\Wording;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -20,7 +21,7 @@ foreach ( Theme::payment_methods() as $bsn_id => $bsn_label ) {
 	/* translators: %s: payment method, e.g. eSewa. */
 	$bsn_items[] = 'cod' === $bsn_id ? array( $bsn_cash, $bsn_label ) : array( $bsn_card, sprintf( __( 'Pay with %s', 'bookstore-nepal' ), $bsn_label ) );
 }
-$bsn_items[] = array( '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 7h11v9H2z"></path><path d="M13 10h4l3 3v3h-7z"></path><circle cx="6" cy="18" r="1.6"></circle><circle cx="17" cy="18" r="1.6"></circle></svg>', __( 'Delivery all over Nepal', 'bookstore-nepal' ) );
+$bsn_items[] = array( '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 7h11v9H2z"></path><path d="M13 10h4l3 3v3h-7z"></path><circle cx="6" cy="18" r="1.6"></circle><circle cx="17" cy="18" r="1.6"></circle></svg>', Wording::text( 'bsn_trust_delivery' ) );
 ?>
 <!-- wp:group {"tagName":"section","align":"full","className":"bsn-trust","layout":{"type":"constrained"}} -->
 <section class="wp-block-group alignfull bsn-trust"><!-- wp:html -->

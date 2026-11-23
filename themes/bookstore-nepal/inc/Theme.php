@@ -57,6 +57,7 @@ final class Theme {
 	 */
 	public static function register(): void {
 		add_action( 'wp_enqueue_scripts', array( self::class, 'enqueue' ) );
+		add_filter( 'bsn_content_defaults', array( Wording::class, 'defaults' ) );
 		add_action( 'wp_head', array( self::class, 'preload_fonts' ), 1 );
 		add_action( 'init', array( self::class, 'register_pattern_category' ) );
 		add_action( 'wp', array( self::class, 'relocate_book_details' ) );
@@ -421,6 +422,15 @@ final class Theme {
 			}
 		}
 		return implode( "\n\n", $out );
+	}
+
+	/**
+	 * Like blocks(), but plain HTML without the block markers: default text for the wording boxes.
+	 *
+	 * @param array<int,array> $items Content items, as for blocks().
+	 */
+	public static function html( array $items ): string {
+		return trim( (string) preg_replace( '/<!--\s*\/?wp:[^>]*?-->\s*/', '', self::blocks( $items ) ) );
 	}
 
 	/**

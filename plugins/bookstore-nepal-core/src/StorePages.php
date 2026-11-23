@@ -156,15 +156,23 @@ class StorePages {
 	}
 
 	/**
+	 * The pattern block a store page holds, whether or not the theme's patterns are registered yet.
+	 *
+	 * @param string $key Page key.
+	 */
+	public static function pattern_block( string $key ): string {
+		return '<!-- wp:pattern {"slug":"bookstore-nepal/page-' . $key . '"} /-->';
+	}
+
+	/**
 	 * Page content: a pattern block when the theme provides the pattern, else a short plain paragraph.
 	 *
 	 * @param string $key   Page key.
 	 * @param string $title Page title.
 	 */
 	public static function content( string $key, string $title ): string {
-		$slug = 'bookstore-nepal/page-' . $key;
-		if ( \WP_Block_Patterns_Registry::get_instance()->is_registered( $slug ) ) {
-			return '<!-- wp:pattern {"slug":"' . $slug . '"} /-->';
+		if ( \WP_Block_Patterns_Registry::get_instance()->is_registered( 'bookstore-nepal/page-' . $key ) ) {
+			return self::pattern_block( $key );
 		}
 		return '<!-- wp:paragraph -->' . "\n" . '<p>'
 			. esc_html(
