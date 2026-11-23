@@ -9,7 +9,6 @@ use BookstoreNepal\Theme\Theme;
 
 defined( 'ABSPATH' ) || exit;
 
-$bsn_methods = Theme::payment_methods();
 $bsn_link    = array(
 	'delivery' => Theme::page_link( 'delivery', __( 'Delivery information', 'bookstore-nepal' ) ),
 	'tracking' => Theme::page_link( 'tracking', __( 'Track your order', 'bookstore-nepal' ) ),
@@ -24,12 +23,7 @@ $bsn_ordering = array(
 	array( 'h2', __( 'Ordering and delivery', 'bookstore-nepal' ) ),
 	array( 'qa', __( 'How much does delivery cost, and how long does it take?', 'bookstore-nepal' ), $bsn_cost ),
 );
-if ( isset( $bsn_methods['cod'] ) ) {
-	$bsn_ordering[] = array( 'qa', __( 'Can I pay when the books arrive?', 'bookstore-nepal' ), esc_html__( 'Yes. Choose cash on delivery at checkout and pay the rider in cash when your books arrive. Please keep your phone nearby so the rider can reach you.', 'bookstore-nepal' ) );
-}
-if ( isset( $bsn_methods['esewa'] ) ) {
-	$bsn_ordering[] = array( 'qa', __( 'How does paying with eSewa work?', 'bookstore-nepal' ), esc_html__( 'Choose eSewa at checkout and place your order. You are taken to eSewa to approve the payment, then brought back to our shop with your confirmation. We never see your eSewa PIN or password. If eSewa charged you but you did not see a confirmation, message us with your phone number and we will check.', 'bookstore-nepal' ) );
-}
+// The cash on delivery and eSewa questions are automatic (Wording::payment_questions()), so they follow the enabled gateways.
 $bsn_ordering[] = array(
 	'qa',
 	__( 'How do I track my order?', 'bookstore-nepal' ),

@@ -60,6 +60,29 @@ final class Wording {
 	}
 
 	/**
+	 * FAQ questions about paying, built from the enabled gateways on every view (never owner text).
+	 *
+	 * @return list<array{question:string,answer:string}>
+	 */
+	public static function payment_questions(): array {
+		$methods = Theme::payment_methods();
+		$out     = array();
+		if ( isset( $methods['cod'] ) ) {
+			$out[] = array(
+				'question' => __( 'Can I pay when the books arrive?', 'bookstore-nepal' ),
+				'answer'   => __( 'Yes. Choose cash on delivery at checkout and pay the rider in cash when your books arrive. Please keep your phone nearby so the rider can reach you.', 'bookstore-nepal' ),
+			);
+		}
+		if ( isset( $methods['esewa'] ) ) {
+			$out[] = array(
+				'question' => __( 'How does paying with eSewa work?', 'bookstore-nepal' ),
+				'answer'   => __( 'Choose eSewa at checkout and place your order. You are taken to eSewa to approve the payment, then brought back to our shop with your confirmation. We never see your eSewa PIN or password. If eSewa charged you but you did not see a confirmation, message us with your phone number and we will check.', 'bookstore-nepal' ),
+			);
+		}
+		return $out;
+	}
+
+	/**
 	 * One default; store-page defaults are only built when a store-page box is asked for.
 	 *
 	 * @param string $field Field name.
