@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.7';
+	public const VERSION = '0.1.8';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -77,6 +77,7 @@ final class Theme {
 	public static function enqueue(): void {
 		wp_enqueue_style( 'bsn-theme', get_stylesheet_uri(), array(), self::VERSION );
 		wp_style_add_data( 'bsn-theme', 'path', get_stylesheet_directory() . '/style.css' );
+		wp_enqueue_script( 'bsn-motion', get_stylesheet_directory_uri() . '/assets/js/motion.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
 		if ( is_front_page() ) {
 			wp_enqueue_script( 'bsn-slider', get_stylesheet_directory_uri() . '/assets/js/slider.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
 		}
