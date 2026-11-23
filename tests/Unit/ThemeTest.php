@@ -846,6 +846,17 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertSame( $tag, Theme::filter_deferred_style_tag( $tag, 'other-handle', 'https://example.org/m.css', 'all' ) );
 	}
 
+	public function test_book_photos_are_portrait_three_by_four_like_the_drawn_covers(): void {
+		Theme::register();
+		$card = wc_get_image_size( 'woocommerce_thumbnail' );
+		$this->assertSame( array( 600, 800, 1 ), array( $card['width'], $card['height'], (int) $card['crop'] ) );
+		$single = wc_get_image_size( 'woocommerce_single' );
+		$this->assertSame( 1000, $single['width'] );
+		$this->assertEmpty( $single['crop'] );
+		$css = (string) file_get_contents( dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/style.css' );
+		$this->assertMatchesRegularExpression( '#\.wc-block-components-product-image img \{[^}]*aspect-ratio: 3 / 4 !important;[^}]*object-fit: cover !important;#', $css );
+	}
+
 	public function test_slider_controls_are_hidden_labelled_buttons_for_the_row(): void {
 		$html = Theme::slider_controls( 'bsn-slider-new-arrivals' );
 		$this->assertSame( 2, substr_count( $html, '<button type="button"' ) );
