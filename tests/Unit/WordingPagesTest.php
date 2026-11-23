@@ -108,6 +108,13 @@ class WordingPagesTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'color:red', $html );
 	}
 
+	public function test_default_links_follow_a_page_address_change(): void {
+		$this->set_permalink_structure( '/%postname%/' );
+		$this->assertStringContainsString( (string) get_permalink( $this->ids['delivery'] ), Wording::defaults()['bsn_faq_items'][0]['answer'] );
+		wp_update_post( array( 'ID' => $this->ids['delivery'], 'post_name' => 'shipping-info' ) );
+		$this->assertStringContainsString( 'shipping-info', Wording::defaults()['bsn_faq_items'][0]['answer'] );
+	}
+
 	public function test_client_text_replaces_default(): void {
 		update_field( 'bsn_about_text', '<p>Our own words</p>', $this->ids['about'] );
 		$html = $this->render( 'about' );
