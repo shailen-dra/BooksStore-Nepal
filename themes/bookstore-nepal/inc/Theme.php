@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.11';
+	public const VERSION = '0.1.12';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -70,6 +70,7 @@ final class Theme {
 		add_action( 'wp', array( self::class, 'relocate_book_details' ) );
 		add_action( 'after_switch_theme', array( self::class, 'ensure_front_page' ) );
 		add_filter( 'render_block_woocommerce/product-image', array( self::class, 'filter_product_image' ), 10, 3 );
+		add_filter( 'pre_render_block', array( self::class, 'single_photo_instead_of_gallery' ), 10, 2 );
 		add_filter( 'render_block_woocommerce/product-collection', array( self::class, 'filter_slider_region' ), 10, 2 );
 		add_filter( 'render_block_core/post-terms', array( self::class, 'filter_plain_terms' ), 10, 2 );
 		add_filter( 'render_block_core/group', array( self::class, 'filter_details_slot' ), 10, 2 );
@@ -121,6 +122,46 @@ final class Theme {
 			'height' => 0,
 			'crop'   => 0,
 		);
+	}
+
+	/** Class of the book page gallery in templates/single-product.html. */
+	public const GALLERY_CLASS = 'bsn-gallery';
+
+	/** What the book page shows instead of the gallery for a book with fewer than two photos. */
+	public const SINGLE_PHOTO_BLOCK = '<!-- wp:woocommerce/product-image {"showProductLink":false,"showSaleBadge":true,"imageSizing":"single","className":"bsn-no-badge"} /-->';
+
+	/**
+	 * Every photo of the book: the product image first, then the gallery photos, each once.
+	 *
+	 * @param \WC_Product $product The book.
+	 * @return int[]
+	 */
+	public static function book_photo_ids( \WC_Product $product ): array {
+		$ids = array_merge( array( (int) $product->get_image_id() ), array_map( 'intval', $product->get_gallery_image_ids() ) );
+		return array_values( array_unique( array_filter( $ids ) ) );
+	}
+
+	/**
+	 * A gallery needs two or more photos. With one photo, or none, the book page keeps its single
+	 * picture: the photo, or the drawn cover with the title.
+	 *
+	 * @param string|null $pre_render  Output so far; null renders the block normally.
+	 * @param array       $parsed_block Block being rendered.
+	 * @return string|null
+	 */
+	public static function single_photo_instead_of_gallery( $pre_render, $parsed_block ) {
+		if ( null !== $pre_render || 'woocommerce/product-gallery' !== ( $parsed_block['blockName'] ?? '' ) ) {
+			return $pre_render;
+		}
+		if ( false === strpos( (string) ( $parsed_block['attrs']['className'] ?? '' ), self::GALLERY_CLASS ) ) {
+			return $pre_render;
+		}
+		$product = wc_get_product( get_the_ID() ?: get_queried_object_id() );
+		if ( ! $product instanceof \WC_Product || count( self::book_photo_ids( $product ) ) >= 2 ) {
+			return $pre_render;
+		}
+		$single = parse_blocks( self::SINGLE_PHOTO_BLOCK )[0];
+		return ( new \WP_Block( $single, array( 'postId' => $product->get_id(), 'postType' => 'product' ) ) )->render();
 	}
 
 	/**

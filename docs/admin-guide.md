@@ -33,9 +33,10 @@ Contents:
    1. Choose it from the **Add existing** drop-down (the list is on the Attributes tab).
    2. Click in the **Value(s)** box and choose one or more values (for example Age group: `4–7`; Language: `Nepali`; Book type: `Story`).
    3. Click **Save attributes**.
-6. On the right, click **Set product image** and upload the cover photo: a portrait picture **1200 × 1600 pixels** (see [section 12](#12-picture-sizes)). If you skip this, the shop draws a coloured cover with the title instead. Only this one photo is shown; photos under **Add product gallery images** do not appear on the site.
-7. Under **Product categories**, tick a category if you use them.
-8. Click **Publish**. The book now appears in the shop.
+6. On the right, click **Set product image** and upload the cover photo: a portrait picture **1200 × 1600 pixels** (see [section 12](#12-picture-sizes)). If you skip this, the shop draws a coloured cover with the title instead.
+7. Optional: under **Add product gallery images**, add the back cover and a few inside pages, same size. On the book's page customers then see small pictures under the cover; tapping one shows it large, and tapping the large photo opens it full screen so the inside pages can be read. The order you drag them into is the order shown.
+8. Under **Product categories**, tick a category if you use them.
+9. Click **Publish**. The book now appears in the shop.
 
 ![The Add new product page](admin-guide/01-add-book.png)
 
@@ -285,18 +286,20 @@ Add a cover photo to each book: shared links then show it as a picture. To give 
 
 ## 12. Picture sizes
 
-The shop uses only two kinds of picture. Everything else (the logo, the books drawn at the top of the home page, the age buttons, the icons) is built into the design and needs no upload.
+The shop uses only these pictures. Everything else (the logo, the books drawn at the top of the home page, the age buttons, the icons) is built into the design and needs no upload.
 
 | Picture | Where it appears | Size to upload | Shape | File |
 |---|---|---|---|---|
 | **Book cover photo** (the **Product image** of each book) | The *New arrivals*, *Best sellers* and *Our favourites* sliders on the home page, the Shop page, search results, the book's own page, the cart and checkout, and link previews on Facebook, Viber and WhatsApp | **1200 × 1600 pixels** (at least 900 × 1200) | Portrait, **3 : 4** (taller than wide) | JPG, under 500 KB |
+| **Back cover and inside pages** (**Product gallery** of a book, optional) | The book's own page: small pictures under the cover, large when tapped, and full screen | **1200 × 1600 pixels**; for a two-page spread photographed open, up to **2400 × 1600** | Portrait 3 : 4 (a spread can be wide) | JPG, under 500 KB |
 | **Site Icon** (Appearance › Editor › Site Identity) | The browser tab, bookmarks, and phone home screens | **512 × 512 pixels** | Square | PNG |
 
 The sliders have no pictures of their own: they show the cover photos of the books you choose for them in the **Home page** form (section 9).
 
 Tips for cover photos:
 
-- **Keep the 3 : 4 shape.** The shop shows every cover in a 3 : 4 frame. A photo of another shape is trimmed to fit, from the middle outwards, so the edges of a wide or very tall photo are cut off.
+- **Keep the 3 : 4 shape.** The shop shows every cover in a 3 : 4 frame. On cards a photo of another shape is trimmed to fit, from the middle outwards, so the edges of a wide or very tall photo are cut off. On the book's own page nothing is trimmed: a wide photo of an open spread shows whole, with space above and below.
+- **Inside pages must be readable.** Photograph them flat, in good light, without glare, and check the text is sharp when you zoom in before uploading.
 - **Fill the frame with the cover.** Photograph or scan the cover straight on, then crop away the table or background so only the cover is left.
 - **Make it small enough.** A phone photo is often 3–5 MB. Shrink it to 1200 × 1600 and save it as JPG (quality about 80%) so it is under 500 KB; big files make the shop slow on mobile data. Free tools such as squoosh.app do this in the browser.
 - **Do not add text, prices or borders** to the photo. The shop shows the title, the age and the price next to it.

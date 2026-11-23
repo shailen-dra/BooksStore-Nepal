@@ -857,6 +857,74 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertMatchesRegularExpression( '#\.wc-block-components-product-image img \{[^}]*aspect-ratio: 3 / 4 !important;[^}]*object-fit: cover !important;#', $css );
 	}
 
+	private function photo( int $parent = 0 ): int {
+		return self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg', $parent );
+	}
+
+	public function test_book_photo_ids_lists_main_photo_first_then_gallery_once_each(): void {
+		$id      = $this->book( 'Rani', array() );
+		$product = wc_get_product( $id );
+		$this->assertSame( array(), Theme::book_photo_ids( $product ) );
+		$main = $this->photo( $id );
+		$back = $this->photo( $id );
+		$product->set_image_id( $main );
+		$product->set_gallery_image_ids( array( $back, $main ) );
+		$product->save();
+		$this->assertSame( array( $main, $back ), Theme::book_photo_ids( wc_get_product( $id ) ) );
+	}
+
+	public function test_book_page_gallery_needs_two_photos_otherwise_single_picture(): void {
+		$gallery = array(
+			'blockName' => 'woocommerce/product-gallery',
+			'attrs'     => array( 'className' => Theme::GALLERY_CLASS ),
+		);
+		Theme::register();
+		$id = $this->book( 'Rani and the River Kite', array() );
+		$this->go_to( get_permalink( $id ) );
+		$GLOBALS['post'] = get_post( $id );
+
+		$none = Theme::single_photo_instead_of_gallery( null, $gallery );
+		$this->assertStringContainsString( 'bsn-cover', (string) $none, 'No photo: the drawn cover.' );
+		$this->assertStringNotContainsString( 'product-gallery', (string) $none );
+
+		$product = wc_get_product( $id );
+		$product->set_image_id( $this->photo( $id ) );
+		$product->save();
+		$one = Theme::single_photo_instead_of_gallery( null, $gallery );
+		$this->assertSame( 1, substr_count( (string) $one, '<img' ), 'One photo: just that photo.' );
+		$this->assertStringNotContainsString( 'bsn-cover', (string) $one );
+
+		$product->set_gallery_image_ids( array( $this->photo( $id ) ) );
+		$product->save();
+		$this->assertNull( Theme::single_photo_instead_of_gallery( null, $gallery ), 'Two photos: the gallery renders.' );
+
+		$other = array( 'blockName' => 'woocommerce/product-gallery', 'attrs' => array() );
+		$product->set_gallery_image_ids( array() );
+		$product->save();
+		$this->assertNull( Theme::single_photo_instead_of_gallery( null, $other ), 'Only the book page gallery is replaced.' );
+		$this->assertSame( 'x', Theme::single_photo_instead_of_gallery( 'x', $gallery ), 'Output from another filter is kept.' );
+		unset( $GLOBALS['post'] );
+	}
+
+	public function test_book_page_template_uses_the_gallery_with_full_screen(): void {
+		$html   = (string) file_get_contents( dirname( __DIR__, 2 ) . '/themes/bookstore-nepal/templates/single-product.html' );
+		$blocks = parse_blocks( $html );
+		$found  = null;
+		$walk   = static function ( array $list ) use ( &$walk, &$found ) {
+			foreach ( $list as $b ) {
+				if ( 'woocommerce/product-gallery' === $b['blockName'] ) {
+					$found = $b;
+				}
+				$walk( $b['innerBlocks'] ?? array() );
+			}
+		};
+		$walk( $blocks );
+		$this->assertNotNull( $found );
+		$this->assertStringContainsString( Theme::GALLERY_CLASS, $found['attrs']['className'] );
+		$this->assertTrue( $found['attrs']['fullScreenOnClick'] );
+		$this->assertSame( array( 'woocommerce/product-gallery-large-image', 'woocommerce/product-gallery-thumbnails' ), array_column( $found['innerBlocks'], 'blockName' ) );
+	}
+
 	public function test_slider_controls_are_hidden_labelled_buttons_for_the_row(): void {
 		$html = Theme::slider_controls( 'bsn-slider-new-arrivals' );
 		$this->assertSame( 2, substr_count( $html, '<button type="button"' ) );

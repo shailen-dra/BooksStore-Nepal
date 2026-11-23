@@ -598,6 +598,86 @@ body {
 .bsn-book__cover .bsn-cover,
 .bsn-book__cover img { border-radius: 20px; box-shadow: 0 12px 0 var(--wp--preset--color--contrast); }
 .bsn-book__cover .bsn-cover { padding: 32px; }
+
+/* Book page gallery (books with two or more photos): front cover, back cover, inside pages. */
+.bsn-gallery {
+	/* WooCommerce sets a square frame inline; books are 3:4. */
+	--wc-block-product-gallery-large-image-ratio-width: 3 !important;
+	--wc-block-product-gallery-large-image-ratio-height: 4 !important;
+	flex-direction: column;
+	flex-wrap: nowrap;
+	gap: 28px;
+	max-width: 460px;
+}
+.bsn-gallery .wc-block-product-gallery-large-image {
+	width: 100%;
+	border-radius: 20px;
+	box-shadow: 0 12px 0 var(--wp--preset--color--contrast);
+	overflow: hidden;
+}
+.bsn-gallery .wc-block-product-gallery-large-image__container { border-radius: 20px; }
+/* Each slide clips its own photo, so no sliver of the next one shows at the edge. */
+.bsn-gallery .wc-block-product-gallery-large-image__wrapper { overflow: hidden; }
+.bsn-gallery .wc-block-components-product-image { max-width: none; }
+.bsn-gallery img { border-radius: 0; box-shadow: none; }
+.bsn-gallery .wc-block-woocommerce-product-gallery-large-image__image--full-screen-on-click { cursor: zoom-in; }
+.bsn-gallery .wc-block-product-gallery-thumbnails {
+	width: 100% !important;
+	height: auto !important;
+	aspect-ratio: auto !important;
+}
+/* One row under the photo on every screen (WooCommerce stacks them in a column on wide screens). */
+.bsn-gallery .wc-block-product-gallery-thumbnails__scrollable {
+	flex-direction: row !important;
+	height: auto !important;
+	gap: 12px;
+	padding: 5px;
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+.bsn-gallery .wc-block-product-gallery-thumbnails__thumbnail {
+	flex: 0 0 calc((100% - 3 * 12px) / 4) !important;
+	width: auto !important;
+	height: auto !important;
+	border-radius: 10px;
+}
+.bsn-gallery .wc-block-product-gallery-thumbnails__thumbnail img {
+	display: block;
+	width: 100% !important;
+	height: auto !important;
+	aspect-ratio: 3 / 4 !important;
+	object-fit: cover !important;
+	border-radius: 10px;
+	cursor: pointer;
+}
+.bsn-gallery .wc-block-product-gallery-thumbnails--active-outline .wc-block-product-gallery-thumbnails__thumbnail__image--is-active {
+	outline: 3px solid var(--wp--preset--color--contrast);
+	outline-offset: 2px;
+}
+.bsn-gallery .wc-block-next-previous-buttons__button {
+	width: var(--bsn-tap);
+	height: var(--bsn-tap);
+	border: 2px solid var(--wp--custom--color--border);
+	border-radius: 50%;
+	background: var(--wp--custom--color--white);
+	color: var(--wp--preset--color--contrast);
+}
+.bsn-gallery .wc-block-next-previous-buttons__button:disabled,
+.bsn-gallery .wc-block-next-previous-buttons__button[aria-disabled="true"] { opacity: 0.35; cursor: default; }
+/* Full-screen view: large enough to read the inside pages. */
+.wc-block-product-gallery-dialog { border: 0; background: var(--wp--preset--color--base, #fff); }
+.wc-block-product-gallery-dialog__close-button {
+	width: var(--bsn-tap);
+	height: var(--bsn-tap);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 2px solid var(--wp--custom--color--border);
+	border-radius: 50%;
+	background: var(--wp--custom--color--white);
+	color: var(--wp--preset--color--contrast);
+}
+.wc-block-product-gallery-dialog__content img { border-radius: 12px; }
 .bsn-book__cover .bsn-cover__title { font-size: clamp(30px, 4vw, 44px); }
 
 .bsn-book__summary {
