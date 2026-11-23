@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.9';
+	public const VERSION = '0.1.10';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -59,6 +59,7 @@ final class Theme {
 		add_action( 'wp_enqueue_scripts', array( self::class, 'enqueue' ) );
 		add_filter( 'bsn_content_defaults', array( Wording::class, 'defaults' ) );
 		add_action( 'wp_head', array( self::class, 'preload_fonts' ), 1 );
+		add_action( 'wp_head', array( self::class, 'print_fallback_icon' ), 99 );
 		add_action( 'init', array( self::class, 'register_pattern_category' ) );
 		add_action( 'wp', array( self::class, 'relocate_book_details' ) );
 		add_action( 'after_switch_theme', array( self::class, 'ensure_front_page' ) );
@@ -79,9 +80,21 @@ final class Theme {
 		wp_enqueue_style( 'bsn-theme', get_stylesheet_uri(), array(), self::VERSION );
 		wp_style_add_data( 'bsn-theme', 'path', get_stylesheet_directory() . '/style.css' );
 		wp_enqueue_script( 'bsn-motion', get_stylesheet_directory_uri() . '/assets/js/motion.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
+		wp_enqueue_script( 'bsn-a11y', get_stylesheet_directory_uri() . '/assets/js/a11y.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
 		if ( is_front_page() ) {
 			wp_enqueue_script( 'bsn-slider', get_stylesheet_directory_uri() . '/assets/js/slider.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
 		}
+	}
+
+	/**
+	 * The book logo as the browser-tab icon until the owner sets a Site Icon in Appearance › Editor ›
+	 * Site Identity; without one browsers ask for /favicon.ico and log a 404.
+	 */
+	public static function print_fallback_icon(): void {
+		if ( has_site_icon() ) {
+			return;
+		}
+		printf( "<link rel=\"icon\" href=\"%s\" type=\"image/svg+xml\" />\n", esc_url( get_stylesheet_directory_uri() . '/assets/icon.svg' ) );
 	}
 
 	/**

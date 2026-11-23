@@ -172,6 +172,7 @@ class SetupCommand {
 		}
 
 		$this->ensure_tracking_page();
+		$this->remove_sample_content();
 		// Structural like the tracking page, so it runs every time; it never touches a page the owner has published or edited.
 		$this->page_report = StorePages::ensure_all();
 		// Fill the wording boxes now that the pages exist (only with ACF Pro active; null means it was not).
@@ -236,6 +237,19 @@ class SetupCommand {
 				)
 			)
 		);
+	}
+
+	/**
+	 * Moves WordPress's "Hello world!" post and "Sample Page" to the bin, so they never reach Google.
+	 * Only while they are untouched: a post someone has edited or retitled is left alone.
+	 */
+	private function remove_sample_content(): void {
+		foreach ( array( 'post' => array( 'hello-world', 'Hello world!' ), 'page' => array( 'sample-page', 'Sample Page' ) ) as $type => $sample ) {
+			$post = get_page_by_path( $sample[0], OBJECT, $type );
+			if ( $post instanceof \WP_Post && $sample[1] === $post->post_title && $post->post_modified_gmt === $post->post_date_gmt ) {
+				wp_trash_post( $post->ID );
+			}
+		}
 	}
 
 	/**

@@ -150,6 +150,13 @@ class Fields {
 						'type'    => 'message',
 						'message' => __( 'These are set in WooCommerce › Settings › General, so they are typed in one place only.', 'bookstore-nepal' ),
 					),
+					array(
+						'name'     => 'bsn_settings_home_hint',
+						'label'    => __( 'Home page wording and slider books', 'bookstore-nepal' ),
+						'type'     => 'message',
+						'esc_html' => 0,
+						'message'  => self::home_hint(),
+					),
 					$textarea( 'bsn_footer_about', __( 'Footer: line under the shop name', 'bookstore-nepal' ) ),
 					$text( 'bsn_footer_help_heading', __( 'Footer: heading above the help links', 'bookstore-nepal' ) ),
 				),
@@ -263,6 +270,18 @@ class Fields {
 			$field['sub_fields']   = array_map( static fn( array $sub ): array => self::acf_field( $sub, $field['key'] . '_' ), $f['sub_fields'] );
 		}
 		return $field;
+	}
+
+	/**
+	 * Where the home page form is, with a link to it when the home page exists.
+	 */
+	private static function home_hint(): string {
+		$text  = esc_html__( 'The home page wording, and the books shown in the New arrivals and Best sellers sliders, are in Pages › Home. The slider books are in section "3. Book rows".', 'bookstore-nepal' );
+		$front = 'page' === get_option( 'show_on_front' ) ? (int) get_option( 'page_on_front' ) : 0;
+		if ( ! $front ) {
+			return $text;
+		}
+		return $text . ' <a href="' . esc_url( admin_url( 'post.php?post=' . $front . '&action=edit' ) ) . '">' . esc_html__( 'Open the Home page form', 'bookstore-nepal' ) . '</a>';
 	}
 
 	/**

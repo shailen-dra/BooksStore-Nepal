@@ -765,6 +765,33 @@ class ThemeTest extends WP_UnitTestCase {
 		wp_dequeue_script( 'bsn-motion' );
 	}
 
+	public function test_a11y_script_loads_on_every_page_deferred_in_footer(): void {
+		$page = self::factory()->post->create( array( 'post_type' => 'page' ) );
+		wp_dequeue_script( 'bsn-a11y' );
+		$this->go_to( get_permalink( $page ) );
+		Theme::enqueue();
+		$this->assertTrue( wp_script_is( 'bsn-a11y', 'enqueued' ) );
+		$script = wp_scripts()->registered['bsn-a11y'];
+		$this->assertStringEndsWith( '/assets/js/a11y.js', $script->src );
+		$this->assertSame( 'defer', $script->extra['strategy'] ?? null );
+		$this->assertSame( 1, $script->extra['group'] ?? null, 'Loads in the footer.' );
+		wp_dequeue_script( 'bsn-a11y' );
+	}
+
+	public function test_book_logo_is_the_tab_icon_until_a_site_icon_is_set(): void {
+		Theme::register();
+		$this->assertNotFalse( has_action( 'wp_head', array( Theme::class, 'print_fallback_icon' ) ) );
+		ob_start();
+		Theme::print_fallback_icon();
+		$this->assertStringContainsString( '/assets/icon.svg" type="image/svg+xml"', (string) ob_get_clean() );
+
+		$icon = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		update_option( 'site_icon', $icon );
+		ob_start();
+		Theme::print_fallback_icon();
+		$this->assertSame( '', (string) ob_get_clean() );
+	}
+
 	public function test_slider_controls_are_hidden_labelled_buttons_for_the_row(): void {
 		$html = Theme::slider_controls( 'bsn-slider-new-arrivals' );
 		$this->assertSame( 2, substr_count( $html, '<button type="button"' ) );

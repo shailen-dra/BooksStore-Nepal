@@ -127,6 +127,17 @@ class ContentFieldsTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_shop_settings_points_to_the_home_page_form(): void {
+		$front = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+		update_option( 'show_on_front', 'page' );
+		update_option( 'page_on_front', $front );
+		$fields = array_column( Fields::acf_group( 'settings' )['fields'], null, 'name' );
+		$hint   = $fields['bsn_settings_home_hint'];
+		$this->assertSame( 'message', $hint['type'] );
+		$this->assertStringContainsString( 'Book rows', $hint['message'] );
+		$this->assertStringContainsString( esc_url( admin_url( 'post.php?post=' . $front . '&action=edit' ) ), $hint['message'] );
+	}
+
 	public function test_groups_hide_the_content_editor_and_register_on_acf_init(): void {
 		$this->assertContains( 'the_content', Fields::acf_group( 'home_hero' )['hide_on_screen'] );
 		Fields::register();
