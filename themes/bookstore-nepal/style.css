@@ -279,9 +279,9 @@ body {
 	line-height: 1.1;
 }
 
-.bsn-hero__book--1 { left: 6%; top: 40px; width: 200px; height: 270px; background: #2F6FB5; color: #FFF; font-size: 24px; transform: rotate(-8deg); }
-.bsn-hero__book--2 { left: 34%; top: 0; width: 210px; height: 290px; background: var(--wp--preset--color--accent-1); color: var(--wp--preset--color--contrast); font-size: 28px; transform: rotate(3deg); }
-.bsn-hero__book--3 { left: 60%; top: 70px; width: 190px; height: 260px; background: #E8746A; color: var(--wp--preset--color--contrast); font-size: 22px; transform: rotate(10deg); }
+.bsn-hero__book--1 { left: 6%; top: 40px; width: 200px; height: 270px; background: #2F6FB5; color: #FFF; font-size: 24px; rotate: -8deg; }
+.bsn-hero__book--2 { left: 34%; top: 0; width: 210px; height: 290px; background: var(--wp--preset--color--accent-1); color: var(--wp--preset--color--contrast); font-size: 28px; rotate: 3deg; }
+.bsn-hero__book--3 { left: 60%; top: 70px; width: 190px; height: 260px; background: #E8746A; color: var(--wp--preset--color--contrast); font-size: 22px; rotate: 10deg; }
 
 /* Shop by age */
 .bsn-ages__grid {
@@ -663,7 +663,12 @@ body {
 
 /* Phones */
 @media (max-width: 781px) {
-	.bsn-hero__books { display: none; }
+	.bsn-hero { gap: 28px; }
+	.bsn-hero__books { flex-basis: 100%; width: 100%; max-width: 360px; height: auto; aspect-ratio: 9 / 5; margin: 0 auto; }
+	.bsn-hero__book { padding: 10px; border-radius: 10px; box-shadow: 0 6px 0 var(--wp--preset--color--contrast); }
+	.bsn-hero__book--1 { left: 4%; top: 24px; width: 30%; height: auto; aspect-ratio: 3 / 4; font-size: clamp(12px, 4vw, 15px); }
+	.bsn-hero__book--2 { left: 35%; top: 0; width: 30%; height: auto; aspect-ratio: 3 / 4; font-size: clamp(13px, 4.2vw, 16px); }
+	.bsn-hero__book--3 { left: auto; right: 4%; top: 34px; width: 30%; height: auto; aspect-ratio: 3 / 4; font-size: clamp(12px, 3.8vw, 14px); }
 	.bsn-age-tile { flex-direction: row; align-items: center; min-height: 0; padding: 16px 18px; border-radius: var(--wp--custom--radius--medium); }
 	.bsn-age-tile__age { min-width: 84px; font-size: 38px; }
 	.bsn-trust__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); font-size: 15px; }
@@ -788,3 +793,99 @@ body {
 
 .bsn-footer__note + .bsn-footer__legal { margin-top: 0; padding-top: 0; border-top: 0; }
 .bsn-footer__legal a { margin-right: 4px; }
+
+/* Playful motion: bouncy but brief. Everything here is skipped when the visitor asks for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+	:root { --bsn-bounce: cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+	/* Hero: text hops in line by line, then the books drop in and keep floating gently */
+	.bsn-hero__text > * { animation: bsn-hop-in 0.6s var(--bsn-bounce) backwards; }
+	.bsn-hero__text > :nth-child(2) { animation-delay: 0.08s; }
+	.bsn-hero__text > :nth-child(3) { animation-delay: 0.16s; }
+	.bsn-hero__text > :nth-child(4) { animation-delay: 0.24s; }
+	.bsn-hero__text > :nth-child(5) { animation-delay: 0.32s; }
+
+	.bsn-hero__book {
+		animation:
+			bsn-drop-in 0.8s var(--bsn-bounce) backwards,
+			bsn-float 5s ease-in-out 0.9s infinite;
+		transition: scale 0.25s var(--bsn-bounce);
+	}
+	.bsn-hero__book--1 { animation-delay: 0.25s, 1.05s; animation-duration: 0.8s, 5.4s; }
+	.bsn-hero__book--2 { animation-delay: 0.4s, 1.2s; animation-duration: 0.8s, 4.6s; }
+	.bsn-hero__book--3 { animation-delay: 0.55s, 1.35s; animation-duration: 0.8s, 5.8s; }
+	.bsn-hero__book:hover { scale: 1.06; }
+
+	/* Logo tilts hello */
+	.bsn-brand:hover .bsn-brand__mark { animation: bsn-wiggle 0.6s ease-in-out; }
+
+	/* Age tiles lift, and the age number gives a little wiggle */
+	.bsn-age-tile { transition: translate 0.25s var(--bsn-bounce), box-shadow 0.25s ease; }
+	.bsn-age-tile:hover, .bsn-age-tile:focus-visible { translate: 0 -6px; }
+	.bsn-age-tile:hover .bsn-age-tile__age, .bsn-age-tile:focus-visible .bsn-age-tile__age { animation: bsn-wiggle 0.6s ease-in-out; }
+	.bsn-age-tile__age { display: inline-block; }
+
+	/* Book covers lift and tilt like a book being picked up */
+	.bsn-products .wc-block-components-product-image a,
+	.bsn-products .wc-block-components-product-image > .bsn-cover,
+	.bsn-products .wc-block-components-product-image > img { transition: translate 0.25s var(--bsn-bounce), rotate 0.25s var(--bsn-bounce); }
+	.bsn-products .wc-block-product:hover .wc-block-components-product-image a,
+	.bsn-products .wc-block-product:hover .wc-block-components-product-image > .bsn-cover,
+	.bsn-products .wc-block-product:hover .wc-block-components-product-image > img { translate: 0 -6px; rotate: -2deg; }
+
+	/* Buttons and chips squish when pressed: works on phones too */
+	.wp-element-button, .wc-block-components-button, .bsn-gift-finder button, .bsn-chip, .bsn-slider-btn,
+	.single_add_to_cart_button, .wc-block-mini-cart__button {
+		transition: scale 0.2s var(--bsn-bounce), translate 0.2s var(--bsn-bounce), background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+	}
+	.wp-element-button:hover, .bsn-gift-finder button:hover, .bsn-chip:hover, .single_add_to_cart_button:hover { translate: 0 -2px; }
+	.wp-element-button:active, .wc-block-components-button:active, .bsn-gift-finder button:active, .bsn-chip:active,
+	.bsn-slider-btn:active:not(:disabled), .single_add_to_cart_button:active, .wc-block-mini-cart__button:active { scale: 0.93; translate: 0 0; }
+
+	/* Cart jiggles when a book goes in */
+	.wc-block-mini-cart__button.is-jiggling { animation: bsn-jiggle 0.7s var(--bsn-bounce); }
+
+	/* Book page cover drops in */
+	.bsn-book__cover .wc-block-components-product-image { animation: bsn-drop-in 0.8s var(--bsn-bounce) backwards; }
+
+	/* Things further down the page pop up as they scroll into view (motion.js marks them) */
+	.bsn-motion .bsn-pop {
+		transition: opacity 0.5s ease, translate 0.6s var(--bsn-bounce), scale 0.6s var(--bsn-bounce);
+		transition-delay: var(--bsn-pop-delay, 0ms);
+	}
+	.bsn-motion .bsn-pop:not(.is-shown) { opacity: 0; translate: 0 28px; scale: 0.96; }
+	.bsn-motion .bsn-age-tile.bsn-pop.is-shown { transition-delay: 0ms; }
+
+	/* Questions open with a little slide */
+	.bsn-faq[open] > :not(summary) { animation: bsn-hop-in 0.35s ease-out backwards; }
+}
+
+@keyframes bsn-hop-in {
+	from { opacity: 0; translate: 0 18px; }
+	to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes bsn-drop-in {
+	0% { opacity: 0; translate: 0 -60px; scale: 0.9; }
+	60% { opacity: 1; }
+	100% { opacity: 1; translate: 0 0; scale: 1; }
+}
+
+@keyframes bsn-float {
+	0%, 100% { translate: 0 0; }
+	50% { translate: 0 -10px; }
+}
+
+@keyframes bsn-wiggle {
+	0%, 100% { rotate: 0deg; }
+	25% { rotate: -8deg; }
+	50% { rotate: 6deg; }
+	75% { rotate: -3deg; }
+}
+
+@keyframes bsn-jiggle {
+	0%, 100% { scale: 1; rotate: 0deg; }
+	30% { scale: 1.2; rotate: -10deg; }
+	55% { scale: 0.95; rotate: 8deg; }
+	80% { scale: 1.05; rotate: -3deg; }
+}

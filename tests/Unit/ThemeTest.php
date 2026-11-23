@@ -722,6 +722,19 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertFalse( wp_script_is( 'bsn-slider', 'enqueued' ) );
 	}
 
+	public function test_motion_script_loads_on_every_page_deferred_in_footer(): void {
+		$product = self::factory()->post->create( array( 'post_type' => 'product' ) );
+		wp_dequeue_script( 'bsn-motion' );
+		$this->go_to( get_permalink( $product ) );
+		Theme::enqueue();
+		$this->assertTrue( wp_script_is( 'bsn-motion', 'enqueued' ) );
+		$script = wp_scripts()->registered['bsn-motion'];
+		$this->assertStringEndsWith( '/assets/js/motion.js', $script->src );
+		$this->assertSame( 'defer', $script->extra['strategy'] ?? null );
+		$this->assertSame( 1, $script->extra['group'] ?? null, 'Loads in the footer.' );
+		wp_dequeue_script( 'bsn-motion' );
+	}
+
 	public function test_slider_controls_are_hidden_labelled_buttons_for_the_row(): void {
 		$html = Theme::slider_controls( 'bsn-slider-new-arrivals' );
 		$this->assertSame( 2, substr_count( $html, '<button type="button"' ) );
