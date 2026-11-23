@@ -100,6 +100,14 @@ class WordingPagesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<summary>Q2</summary>', $html );
 	}
 
+	public function test_faq_answers_are_cleaned_like_rich_boxes(): void {
+		update_field( 'bsn_faq_items', array( array( 'heading' => '', 'question' => 'Q', 'answer' => '<p style="color:red">A</p><script>bad()</script>' ) ), $this->ids['faq'] );
+		$html = $this->render( 'faq' );
+		$this->assertStringContainsString( '>A</p>', $html );
+		$this->assertStringNotContainsString( 'bad()', $html );
+		$this->assertStringNotContainsString( 'color:red', $html );
+	}
+
 	public function test_client_text_replaces_default(): void {
 		update_field( 'bsn_about_text', '<p>Our own words</p>', $this->ids['about'] );
 		$html = $this->render( 'about' );

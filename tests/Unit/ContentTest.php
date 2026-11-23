@@ -68,6 +68,29 @@ class ContentTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'iframe', $html );
 	}
 
+	public function test_clean_html_drops_script_and_style_with_their_contents(): void {
+		$html = Content::clean_html( '<p>Keep</p><script>alert(1)</script><style>body{display:none}</style><p>Also</p>' );
+		$this->assertStringContainsString( '<p>Keep</p>', $html );
+		$this->assertStringContainsString( '<p>Also</p>', $html );
+		$this->assertStringNotContainsString( 'alert', $html );
+		$this->assertStringNotContainsString( 'display:none', $html );
+	}
+
+	public function test_clean_html_drops_inline_styles_but_keeps_other_attributes(): void {
+		$html = Content::clean_html( '<p style="position:fixed;top:0">Hi <a href="https://example.com/" style="color:red">link</a> <span class="bsn-placeholder" style="font-size:40px">x</span></p>' );
+		$this->assertStringNotContainsString( 'style=', $html );
+		$this->assertStringContainsString( 'href="https://example.com/"', $html );
+		$this->assertStringContainsString( 'class="bsn-placeholder"', $html );
+	}
+
+	public function test_rich_uses_clean_html(): void {
+		$about = $this->store_page( 'about' );
+		update_field( 'bsn_about_text', '<p style="color:red">Hi</p><script>bad()</script>', $about );
+		$html = Content::rich( 'bsn_about_text', '' );
+		$this->assertStringNotContainsString( 'style=', $html );
+		$this->assertStringNotContainsString( 'bad()', $html );
+	}
+
 	public function test_rich_adds_paragraphs_to_plain_lines(): void {
 		$about = $this->store_page( 'about' );
 		update_field( 'bsn_about_text', "One\n\nTwo", $about );

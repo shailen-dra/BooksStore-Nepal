@@ -24,13 +24,13 @@ if ( isset( $bsn_methods['cod'] ) ) {
 }
 ?>
 <!-- wp:group {"className":"bsn-info","layout":{"type":"constrained"}} -->
-<div class="wp-block-group bsn-info"><?php echo Wording::rich( 'bsn_delivery_intro' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by wp_kses_post. ?>
+<div class="wp-block-group bsn-info"><?php echo Wording::rich( 'bsn_delivery_intro' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by Wording::clean(). ?>
 
 <!-- wp:pattern {"slug":"bookstore-nepal/delivery-rates"} /-->
 
-<?php echo Wording::rich( 'bsn_delivery_times' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by wp_kses_post. ?><?php
+<?php echo Wording::rich( 'bsn_delivery_times' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by Wording::clean(). ?><?php
 if ( $bsn_pay ) {
 	echo Theme::blocks( array_merge( array( array( 'h2', __( 'Paying for your order', 'bookstore-nepal' ) ) ), $bsn_pay ) ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside Theme::blocks().
 }
-?><?php echo Wording::rich( 'bsn_delivery_after' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by wp_kses_post. ?></div>
+?><?php echo Wording::rich( 'bsn_delivery_after' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by Wording::clean(). ?></div>
 <!-- /wp:group -->

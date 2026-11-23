@@ -37,14 +37,23 @@ final class Wording {
 	}
 
 	/**
-	 * Rich text, already made safe (wp_kses_post).
+	 * Rich text, already made safe (clean()).
 	 *
 	 * @param string $field Field name.
 	 */
 	public static function rich( string $field ): string {
 		$default = self::default_of( $field );
 		$default = is_string( $default ) ? $default : '';
-		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::rich( $field, $default ) : wp_kses_post( wpautop( $default ) );
+		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::rich( $field, $default ) : self::clean( wpautop( $default ) );
+	}
+
+	/**
+	 * Makes owner HTML safe for output (the plugin's cleaner when it is active).
+	 *
+	 * @param string $html HTML.
+	 */
+	public static function clean( string $html ): string {
+		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::clean_html( $html ) : wp_kses_post( $html );
 	}
 
 	/**

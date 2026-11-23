@@ -75,7 +75,7 @@ class Content {
 	}
 
 	/**
-	 * Rich text from a field, or the default, always through wpautop and wp_kses_post.
+	 * Rich text from a field, or the default, always through wpautop and clean_html().
 	 *
 	 * @param string $field        Field name.
 	 * @param string $default_html Default HTML.
@@ -83,7 +83,24 @@ class Content {
 	public static function rich( string $field, string $default_html ): string {
 		$value = self::raw( $field );
 		$html  = is_string( $value ) && '' !== trim( wp_strip_all_tags( $value ) ) ? $value : $default_html;
-		return wp_kses_post( wpautop( $html ) );
+		return self::clean_html( wpautop( $html ) );
+	}
+
+	/**
+	 * Safe owner HTML: script and style blocks go with their contents, inline styles are dropped (so
+	 * text pasted from Word or a web page cannot change the layout), then wp_kses_post.
+	 *
+	 * @param string $html HTML.
+	 */
+	public static function clean_html( string $html ): string {
+		$html    = (string) preg_replace( '#<(script|style)\b[^>]*>.*?</\1\s*>#is', '', $html );
+		$allowed = wp_kses_allowed_html( 'post' );
+		foreach ( $allowed as $tag => $attrs ) {
+			if ( is_array( $attrs ) ) {
+				unset( $allowed[ $tag ]['style'] );
+			}
+		}
+		return wp_kses( $html, $allowed );
 	}
 
 	/**
