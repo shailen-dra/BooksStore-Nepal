@@ -86,13 +86,24 @@ class Prefill {
 			if ( ! is_int( $post_id ) || ! isset( $defs[ $key ] ) ) {
 				continue;
 			}
-			$pattern = StorePages::content( $key, $defs[ $key ]['title'] );
+			// Compared with the literal pattern block: this runs on acf/init, before the theme's patterns
+			// are registered, when StorePages::content() would answer with its placeholder paragraph.
+			$pattern = StorePages::pattern_block( $key );
 			$content = trim( (string) get_post_field( 'post_content', $post_id ) );
+			$text    = Content::strip_block_comments( $content );
 			$first   = $group['fields'][0]['name'];
-			if ( '' === $content || $pattern === $content || ! self::is_empty( get_field( $first, $post_id, false ) ) ) {
+			$ours    = array( $pattern, StorePages::content( $key, $defs[ $key ]['title'] ) );
+			if ( in_array( $content, $ours, true ) || '' === trim( wp_strip_all_tags( $text ) ) ) {
+				// Untouched (our pattern block, or our placeholder when the theme was inactive): show the boxes.
+				if ( $pattern !== $content ) {
+					wp_update_post( array( 'ID' => $post_id, 'post_content' => $pattern ) );
+				}
 				continue;
 			}
-			update_field( $first, Content::strip_block_comments( $content ), $post_id );
+			if ( ! self::is_empty( get_field( $first, $post_id, false ) ) ) {
+				continue;
+			}
+			update_field( $first, $text, $post_id );
 			wp_update_post(
 				array(
 					'ID'           => $post_id,

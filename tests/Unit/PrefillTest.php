@@ -68,7 +68,26 @@ class PrefillTest extends WP_UnitTestCase {
 		$saved = (string) get_field( 'bsn_about_text', $this->ids['about'] );
 		$this->assertStringContainsString( '<p>Our own story</p>', $saved );
 		$this->assertStringNotContainsString( '<!-- wp:', $saved );
-		$this->assertSame( StorePages::content( 'about', StorePages::definitions()['about']['title'] ), get_post( $this->ids['about'] )->post_content );
+		$this->assertSame( '<!-- wp:pattern {"slug":"bookstore-nepal/page-about"} /-->', get_post( $this->ids['about'] )->post_content );
+	}
+
+	public function test_pattern_block_pages_count_as_untouched_even_before_patterns_register(): void {
+		// acf/init runs before the theme's patterns are registered, so StorePages::content() would
+		// return its placeholder paragraph; a page holding its own pattern block is still untouched.
+		$block = '<!-- wp:pattern {"slug":"bookstore-nepal/page-about"} /-->';
+		wp_update_post( array( 'ID' => $this->ids['about'], 'post_content' => $block ) );
+		Prefill::run();
+		$this->assertSame( $block, get_post( $this->ids['about'] )->post_content );
+		$this->assertStringContainsString( 'We are a bookshop for young readers.', (string) get_field( 'bsn_about_text', $this->ids['about'] ) );
+	}
+
+	public function test_placeholder_page_counts_as_untouched(): void {
+		$placeholder = StorePages::content( 'terms', StorePages::definitions()['terms']['title'] );
+		$this->assertStringContainsString( '[CLIENT:', $placeholder, 'Patterns are not registered in tests.' );
+		wp_update_post( array( 'ID' => $this->ids['terms'], 'post_content' => $placeholder ) );
+		Prefill::run();
+		$this->assertStringNotContainsString( '[CLIENT: write', (string) get_field( 'bsn_terms_text', $this->ids['terms'] ) );
+		$this->assertSame( '<!-- wp:pattern {"slug":"bookstore-nepal/page-terms"} /-->', get_post( $this->ids['terms'] )->post_content );
 	}
 
 	public function test_untouched_page_gets_default_not_its_pattern_block(): void {
