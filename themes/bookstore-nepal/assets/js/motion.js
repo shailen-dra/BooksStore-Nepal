@@ -11,7 +11,7 @@
 
 	var root = document.documentElement;
 	var targets = document.querySelectorAll(
-		'.bsn-main .bsn-section__head, .bsn-main .bsn-products .wc-block-product, .bsn-age-tile, .bsn-gift, .bsn-trust__list li, .bsn-book-details, .bsn-delivery, .bsn-faq'
+		'.bsn-main .bsn-section__head, .bsn-main .bsn-products:not(.bsn-slider) .wc-block-product, .bsn-age-tile, .bsn-gift, .bsn-trust__list li, .bsn-book-details, .bsn-delivery, .bsn-faq'
 	);
 
 	var observer = new IntersectionObserver(
@@ -26,7 +26,8 @@
 		{ rootMargin: '0px 0px -8% 0px', threshold: 0.08 }
 	);
 
-	// Cards and tiles in the same row pop in one after another. Anything already on screen
+	// Cards and tiles in the same row pop in one after another. Slider cards are left alone: their
+	// scrolling row clips anything that moves above it. Anything already on screen
 	// when this runs stays put, so nothing the visitor can already see blinks out and back.
 	var fold = window.innerHeight || root.clientHeight;
 	Array.prototype.forEach.call( targets, function ( el ) {

@@ -83,6 +83,7 @@ if ( null !== $bsn_tracking ) {
 $bsn_nav = serialize_block_attributes(
 	array(
 		'overlayMenu'         => 'mobile',
+		'icon'                => 'menu',
 		'openSubmenusOnClick' => true,
 		'className'           => 'bsn-nav',
 		'ariaLabel'           => __( 'Main', 'bookstore-nepal' ),
