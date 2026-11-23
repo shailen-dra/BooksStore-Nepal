@@ -131,6 +131,108 @@ class Fields {
 		);
 	}
 
+	/** Menu slug of the Shop settings page. */
+	public const OPTIONS_SLUG = 'bsn-shop-settings';
+
+	/**
+	 * Hooks registration onto ACF's init.
+	 */
+	public static function register(): void {
+		add_action( 'acf/init', array( self::class, 'register_groups' ) );
+	}
+
+	/**
+	 * Registers the Shop settings page and every field group whose screen exists.
+	 */
+	public static function register_groups(): void {
+		if ( function_exists( 'acf_add_options_page' ) ) {
+			acf_add_options_page(
+				array(
+					'page_title' => __( 'Shop settings', 'bookstore-nepal' ),
+					'menu_title' => __( 'Shop settings', 'bookstore-nepal' ),
+					'menu_slug'  => self::OPTIONS_SLUG,
+					'capability' => 'manage_woocommerce',
+					'position'   => 56,
+					'icon_url'   => 'dashicons-store',
+					'redirect'   => false,
+				)
+			);
+		}
+		if ( ! function_exists( 'acf_add_local_field_group' ) ) {
+			return;
+		}
+		foreach ( array_keys( self::schema() ) as $key ) {
+			$group = self::acf_group( $key );
+			if ( $group['location'] ) {
+				acf_add_local_field_group( $group );
+			}
+		}
+	}
+
+	/**
+	 * The array handed to acf_add_local_field_group() for one group; `location` is empty when the
+	 * group's page is not set up.
+	 *
+	 * @param string $key Group key from schema().
+	 * @return array<string,mixed>
+	 */
+	public static function acf_group( string $key ): array {
+		$def = self::schema()[ $key ];
+		return array(
+			'key'            => 'group_bsn_' . $key,
+			'title'          => $def['title'],
+			'fields'         => array_map( static fn( array $f ): array => self::acf_field( $f, 'field_' ), $def['fields'] ),
+			'location'       => self::acf_location( $def['location'] ),
+			'position'       => 'acf_after_title',
+			'style'          => 'seamless',
+			'hide_on_screen' => array( 'the_content' ),
+		);
+	}
+
+	/**
+	 * ACF location rules for a schema location.
+	 *
+	 * @param string $location Schema location.
+	 * @return array<int,array<int,array<string,string>>>
+	 */
+	private static function acf_location( string $location ): array {
+		if ( 'front_page' === $location ) {
+			return array( array( array( 'param' => 'page_type', 'operator' => '==', 'value' => 'front_page' ) ) );
+		}
+		if ( 'options' === $location ) {
+			return array( array( array( 'param' => 'options_page', 'operator' => '==', 'value' => self::OPTIONS_SLUG ) ) );
+		}
+		$id = Content::post_id_for( $location );
+		return is_int( $id ) ? array( array( array( 'param' => 'page', 'operator' => '==', 'value' => (string) $id ) ) ) : array();
+	}
+
+	/**
+	 * A schema field as ACF wants it, with a stable key.
+	 *
+	 * @param array  $f      Schema field.
+	 * @param string $prefix Key prefix.
+	 * @return array<string,mixed>
+	 */
+	private static function acf_field( array $f, string $prefix ): array {
+		$field = $f + array( 'key' => $prefix . $f['name'] );
+		if ( 'wysiwyg' === $f['type'] ) {
+			$field += array(
+				'tabs'         => 'visual',
+				'toolbar'      => 'basic',
+				'media_upload' => 0,
+			);
+		}
+		if ( 'textarea' === $f['type'] ) {
+			$field += array( 'rows' => 3, 'new_lines' => '' );
+		}
+		if ( 'repeater' === $f['type'] ) {
+			$field['layout']       = 'block';
+			$field['button_label'] = __( 'Add a question', 'bookstore-nepal' );
+			$field['sub_fields']   = array_map( static fn( array $sub ): array => self::acf_field( $sub, $field['key'] . '_' ), $f['sub_fields'] );
+		}
+		return $field;
+	}
+
 	/**
 	 * One field definition.
 	 *
