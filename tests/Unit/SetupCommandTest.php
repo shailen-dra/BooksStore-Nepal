@@ -102,6 +102,33 @@ class SetupCommandTest extends WP_UnitTestCase {
 		$this->assertSame( '[woocommerce_order_tracking]', $pages[0]->post_content );
 	}
 
+	public function test_setup_bins_untouched_sample_post_and_page_only(): void {
+		$hello  = self::factory()->post->create( array( 'post_name' => 'hello-world', 'post_title' => 'Hello world!' ) );
+		$sample = self::factory()->post->create( array( 'post_type' => 'page', 'post_name' => 'sample-page', 'post_title' => 'Sample Page' ) );
+		$kept   = self::factory()->post->create( array( 'post_type' => 'page', 'post_name' => 'about-us', 'post_title' => 'About us' ) );
+		( new SetupCommand() )->run( array() );
+		$this->assertSame( 'trash', get_post_status( $hello ) );
+		$this->assertSame( 'trash', get_post_status( $sample ) );
+		$this->assertSame( 'publish', get_post_status( $kept ) );
+	}
+
+	public function test_setup_keeps_a_sample_page_the_owner_edited(): void {
+		$sample = self::factory()->post->create(
+			array(
+				'post_type'         => 'page',
+				'post_name'         => 'sample-page',
+				'post_title'        => 'Sample Page',
+				'post_date_gmt'     => '2026-01-01 00:00:00',
+				'post_modified_gmt' => '2026-01-01 00:00:00',
+			)
+		);
+		global $wpdb;
+		$wpdb->update( $wpdb->posts, array( 'post_modified_gmt' => '2026-02-01 00:00:00' ), array( 'ID' => $sample ) );
+		clean_post_cache( $sample );
+		( new SetupCommand() )->run( array() );
+		$this->assertSame( 'publish', get_post_status( $sample ) );
+	}
+
 	public function test_trashed_tracking_page_is_replaced(): void {
 		$command = new SetupCommand();
 		$command->run( array() );

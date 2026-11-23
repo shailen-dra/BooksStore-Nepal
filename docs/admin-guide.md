@@ -16,6 +16,7 @@ Contents:
 8. [Shop information pages](#8-shop-information-pages)
 9. [Change the home page wording](#9-change-the-home-page-wording)
 10. [Shop settings (footer)](#10-shop-settings-footer)
+11. [How the shop looks on Google and in shared links](#11-how-the-shop-looks-on-google-and-in-shared-links)
 
 ---
 
@@ -265,6 +266,19 @@ Go to **Shop settings** in the left menu to change the line under the shop name 
 Your phone, WhatsApp, email and address are not here: they are in **WooCommerce › Settings › General** (section 8), so you only type them in one place.
 
 ![Shop settings](admin-guide/12-shop-settings.png)
+
+---
+
+## 11. How the shop looks on Google and in shared links
+
+When someone finds the shop on Google, or shares a link on Facebook, Viber or WhatsApp, a short summary appears under the title. The shop fills it in for you:
+
+- **A book** uses its **Product short description** (the box under the main description when you edit a book). If that is empty it uses the main description, and if both are empty it writes "*Title* by *Author* — a children's book for ages …".
+- **The home page** uses the line under the big heading (**Home page** form, section 9).
+- **The Shop page** uses the footer line (**Shop settings**, section 10).
+- **Other pages** (About us, Delivery, FAQ and so on) use the first words of the page.
+
+Add a cover photo to each book: shared links then show it as a picture. To give the shop its own browser-tab icon, go to **Appearance › Editor**, click the shop name, and choose a **Site Icon** (a square image, at least 512 × 512 pixels). Until you do, the tab shows the orange book logo.
 
 ---
 
