@@ -60,6 +60,10 @@ final class Theme {
 		add_filter( 'bsn_content_defaults', array( Wording::class, 'defaults' ) );
 		add_action( 'wp_head', array( self::class, 'preload_fonts' ), 1 );
 		add_action( 'wp_head', array( self::class, 'print_fallback_icon' ), 99 );
+		add_action( 'wp_enqueue_scripts', array( self::class, 'defer_jquery' ), 100 );
+		add_action( 'wp_head', array( self::class, 'mark_inlinable_styles' ), 0 );
+		add_filter( 'styles_inline_size_limit', array( self::class, 'inline_size_limit' ) );
+		add_filter( 'style_loader_tag', array( self::class, 'filter_deferred_style_tag' ), 10, 4 );
 		add_action( 'init', array( self::class, 'register_pattern_category' ) );
 		add_action( 'wp', array( self::class, 'relocate_book_details' ) );
 		add_action( 'after_switch_theme', array( self::class, 'ensure_front_page' ) );
@@ -84,6 +88,92 @@ final class Theme {
 		if ( is_front_page() ) {
 			wp_enqueue_script( 'bsn-slider', get_stylesheet_directory_uri() . '/assets/js/slider.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
 		}
+	}
+
+	/**
+	 * Lets jQuery load deferred instead of blocking the first paint. The shop's block pages never use it;
+	 * only WooCommerce's older scripts do, and those are deferred already. WordPress keeps jQuery
+	 * blocking by itself on any page where a script that needs it is still blocking, so nothing breaks.
+	 */
+	public static function defer_jquery(): void {
+		// 'jquery' itself is only an alias with no file; the two files carry the strategy.
+		foreach ( array( 'jquery-core', 'jquery-migrate' ) as $handle ) {
+			if ( wp_script_is( $handle, 'registered' ) ) {
+				wp_script_add_data( $handle, 'strategy', 'defer' );
+			}
+		}
+	}
+
+	/** Styles only the closed mini-cart drawer needs: loaded without holding up the first paint. */
+	public const DEFERRED_STYLES = array( 'wc-blocks-style-mini-cart-contents' );
+
+	/**
+	 * Rules from the deferred drawer stylesheet that keep the closed drawer out of sight until it arrives.
+	 */
+	public const DRAWER_CRITICAL_CSS = '.wc-block-components-drawer__screen-overlay{position:fixed;inset:0;z-index:9999}'
+		. '.wc-block-components-drawer__screen-overlay--is-hidden{opacity:0;pointer-events:none}'
+		. '.wc-block-components-drawer{position:fixed;top:0;height:100%;inset-inline-start:100%}';
+
+	/** Page budget for styles printed inside the page instead of as separate files. */
+	public const INLINE_STYLE_LIMIT = 60000;
+
+	/**
+	 * Raises WordPress's inline-style budget (40 KB) so WooCommerce's small block styles fit beside the
+	 * core ones; the big stylesheets stay separate files the browser can cache.
+	 *
+	 * @param mixed $limit Budget in bytes.
+	 */
+	public static function inline_size_limit( $limit ): int {
+		return max( (int) $limit, self::INLINE_STYLE_LIMIT );
+	}
+
+	/**
+	 * Gives WooCommerce's stylesheets a file path, which is what lets WordPress print the small ones
+	 * inside the page (smallest first, within the budget). Screen-size-only sheets are skipped: inlined
+	 * they would lose their media query. Also adds the drawer's critical rules.
+	 */
+	public static function mark_inlinable_styles(): void {
+		if ( ! defined( 'WC_PLUGIN_FILE' ) || ! defined( 'WC_ABSPATH' ) ) {
+			return;
+		}
+		$styles = wp_styles();
+		$base   = plugins_url( '/', WC_PLUGIN_FILE );
+		foreach ( $styles->queue as $handle ) {
+			$style = $styles->registered[ $handle ] ?? null;
+			if ( ! $style || ! is_string( $style->src ) || in_array( $handle, self::DEFERRED_STYLES, true ) || $styles->get_data( $handle, 'path' ) ) {
+				continue;
+			}
+			if ( ! in_array( (string) $style->args, array( '', 'all' ), true ) || 0 !== strpos( $style->src, $base ) ) {
+				continue;
+			}
+			$path = WC_ABSPATH . substr( (string) strtok( $style->src, '?' ), strlen( $base ) );
+			if ( is_readable( $path ) ) {
+				$styles->add_data( $handle, 'path', $path );
+			}
+		}
+		foreach ( self::DEFERRED_STYLES as $handle ) {
+			if ( wp_style_is( $handle, 'enqueued' ) ) {
+				wp_add_inline_style( $handle, self::DRAWER_CRITICAL_CSS );
+			}
+		}
+	}
+
+	/**
+	 * Loads the drawer stylesheet without blocking: as a print sheet that switches to all screens once
+	 * downloaded, with a plain link for browsers without JavaScript.
+	 *
+	 * @param mixed  $tag    Link tag.
+	 * @param string $handle Style handle.
+	 * @param string $href   Stylesheet URL.
+	 * @param string $media  Media attribute.
+	 */
+	public static function filter_deferred_style_tag( $tag, $handle, $href = '', $media = 'all' ): string {
+		$tag = (string) $tag;
+		if ( ! in_array( $handle, self::DEFERRED_STYLES, true ) || 'all' !== $media || ! preg_match( "/ media=(['\"])all\\1/", $tag ) ) {
+			return $tag;
+		}
+		$async = preg_replace( "/ media=(['\"])all\\1/", ' media="print" onload="this.media=\'all\';this.onload=null"', $tag, 1 );
+		return $async . '<noscript>' . trim( $tag ) . "</noscript>\n";
 	}
 
 	/**

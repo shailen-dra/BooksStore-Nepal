@@ -792,6 +792,60 @@ class ThemeTest extends WP_UnitTestCase {
 		$this->assertSame( '', (string) ob_get_clean() );
 	}
 
+	public function test_jquery_is_marked_defer_and_falls_back_when_a_dependent_blocks(): void {
+		$saved = $GLOBALS['wp_scripts'] ?? null;
+		$print = static function ( string $dependent_strategy ): string {
+			$GLOBALS['wp_scripts'] = null;
+			Theme::defer_jquery();
+			$args = $dependent_strategy ? array( 'strategy' => $dependent_strategy ) : array();
+			wp_enqueue_script( 'bsn-test-dependent', 'https://example.org/dep.js', array( 'jquery' ), '1', $args );
+			ob_start();
+			wp_scripts()->do_items( array( 'bsn-test-dependent' ) );
+			return (string) ob_get_clean();
+		};
+		$jquery_tag = static function ( string $html ): string {
+			preg_match( '#<script[^>]*id="jquery-core-js"[^>]*>#', $html, $m );
+			return $m[0] ?? '';
+		};
+		$this->assertMatchesRegularExpression( '#\sdefer[\s>]#', $jquery_tag( $print( 'defer' ) ) );
+		$blocking = $jquery_tag( $print( '' ) );
+		$this->assertNotSame( '', $blocking );
+		$this->assertDoesNotMatchRegularExpression( '#\sdefer[\s>]#', $blocking, 'A blocking script that needs jQuery keeps jQuery blocking.' );
+		$GLOBALS['wp_scripts'] = $saved;
+	}
+
+	public function test_inline_style_budget_is_raised_but_never_lowered(): void {
+		$this->assertSame( Theme::INLINE_STYLE_LIMIT, Theme::inline_size_limit( 40000 ) );
+		$this->assertSame( 90000, Theme::inline_size_limit( 90000 ) );
+	}
+
+	public function test_small_woocommerce_styles_get_a_path_and_screen_only_ones_do_not(): void {
+		$base = plugins_url( '/assets/css/', WC_PLUGIN_FILE );
+		wp_enqueue_style( 'bsn-test-wc', $base . 'woocommerce-layout.css', array(), '1' );
+		wp_enqueue_style( 'bsn-test-wc-small', $base . 'woocommerce-smallscreen.css', array(), '1', 'only screen and (max-width: 768px)' );
+		wp_enqueue_style( 'bsn-test-other', 'https://example.org/x.css', array(), '1' );
+		wp_enqueue_style( 'wc-blocks-style-mini-cart-contents', plugins_url( '/assets/client/blocks/mini-cart-contents.css', WC_PLUGIN_FILE ), array(), '1' );
+		Theme::mark_inlinable_styles();
+		$styles = wp_styles();
+		$this->assertSame( WC_ABSPATH . 'assets/css/woocommerce-layout.css', $styles->get_data( 'bsn-test-wc', 'path' ) );
+		$this->assertFalse( $styles->get_data( 'bsn-test-wc-small', 'path' ) );
+		$this->assertFalse( $styles->get_data( 'bsn-test-other', 'path' ) );
+		$this->assertFalse( $styles->get_data( 'wc-blocks-style-mini-cart-contents', 'path' ), 'The deferred drawer sheet stays a file.' );
+		$this->assertContains( Theme::DRAWER_CRITICAL_CSS, (array) $styles->get_data( 'wc-blocks-style-mini-cart-contents', 'after' ) );
+		foreach ( array( 'bsn-test-wc', 'bsn-test-wc-small', 'bsn-test-other', 'wc-blocks-style-mini-cart-contents' ) as $handle ) {
+			wp_dequeue_style( $handle );
+			wp_deregister_style( $handle );
+		}
+	}
+
+	public function test_drawer_stylesheet_loads_without_blocking_with_a_noscript_fallback(): void {
+		$tag = "<link rel='stylesheet' id='wc-blocks-style-mini-cart-contents-css' href='https://example.org/m.css' media='all' />\n";
+		$out = Theme::filter_deferred_style_tag( $tag, 'wc-blocks-style-mini-cart-contents', 'https://example.org/m.css', 'all' );
+		$this->assertStringContainsString( 'media="print" onload="this.media=\'all\';this.onload=null"', $out );
+		$this->assertStringContainsString( "<noscript><link rel='stylesheet' id='wc-blocks-style-mini-cart-contents-css' href='https://example.org/m.css' media='all' /></noscript>", $out );
+		$this->assertSame( $tag, Theme::filter_deferred_style_tag( $tag, 'other-handle', 'https://example.org/m.css', 'all' ) );
+	}
+
 	public function test_slider_controls_are_hidden_labelled_buttons_for_the_row(): void {
 		$html = Theme::slider_controls( 'bsn-slider-new-arrivals' );
 		$this->assertSame( 2, substr_count( $html, '<button type="button"' ) );
