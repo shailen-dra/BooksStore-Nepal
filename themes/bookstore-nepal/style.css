@@ -221,6 +221,8 @@ body {
 	width: var(--bsn-tap);
 	height: var(--bsn-tap);
 	justify-content: center;
+	align-items: center;
+	padding: 0;
 	border: 2px solid var(--wp--custom--color--border);
 	border-radius: 22px;
 	background: var(--wp--custom--color--white);
@@ -229,7 +231,9 @@ body {
 .bsn-nav .wp-block-navigation__responsive-container-close {
 	width: var(--bsn-tap);
 	height: var(--bsn-tap);
+	display: flex;
 	justify-content: center;
+	align-items: center;
 }
 
 /* Hero */
