@@ -23,6 +23,7 @@ class EditorSwitch {
 		add_action( 'load-post.php', array( self::class, 'hide_content_editor' ) );
 		add_action( 'admin_menu', array( self::class, 'remove_site_editor_menu' ), 999 );
 		add_action( 'load-site-editor.php', array( self::class, 'block_site_editor' ) );
+		add_action( 'admin_bar_menu', array( self::class, 'remove_admin_bar_link' ), 999 );
 	}
 
 	/**
@@ -62,6 +63,17 @@ class EditorSwitch {
 	public static function remove_site_editor_menu(): void {
 		if ( ! self::site_editor_allowed() ) {
 			remove_submenu_page( 'themes.php', 'site-editor.php' );
+		}
+	}
+
+	/**
+	 * Removes "Edit site" from the toolbar shown on the front of the site.
+	 *
+	 * @param \WP_Admin_Bar $bar Toolbar.
+	 */
+	public static function remove_admin_bar_link( $bar ): void {
+		if ( $bar instanceof \WP_Admin_Bar && ! self::site_editor_allowed() ) {
+			$bar->remove_node( 'site-editor' );
 		}
 	}
 

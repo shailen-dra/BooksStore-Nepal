@@ -63,11 +63,25 @@ class EditorSwitchTest extends WP_UnitTestCase {
 		$this->assertFalse( EditorSwitch::site_editor_allowed() );
 	}
 
+	public function test_admin_bar_edit_site_link_removed_unless_allowed(): void {
+		require_once ABSPATH . WPINC . '/class-wp-admin-bar.php';
+		$bar = new WP_Admin_Bar();
+		$bar->add_node( array( 'id' => 'site-editor', 'title' => 'Edit site', 'href' => admin_url( 'site-editor.php' ) ) );
+		EditorSwitch::remove_admin_bar_link( $bar );
+		$this->assertNull( $bar->get_node( 'site-editor' ) );
+
+		$bar->add_node( array( 'id' => 'site-editor', 'title' => 'Edit site' ) );
+		add_filter( 'bsn_site_editor_allowed', '__return_true' );
+		EditorSwitch::remove_admin_bar_link( $bar );
+		$this->assertNotNull( $bar->get_node( 'site-editor' ) );
+	}
+
 	public function test_hooks_registered(): void {
 		EditorSwitch::register();
 		$this->assertNotFalse( has_filter( 'use_block_editor_for_post', array( EditorSwitch::class, 'filter_block_editor' ) ) );
 		$this->assertNotFalse( has_action( 'load-post.php', array( EditorSwitch::class, 'hide_content_editor' ) ) );
 		$this->assertSame( 999, has_action( 'admin_menu', array( EditorSwitch::class, 'remove_site_editor_menu' ) ) );
 		$this->assertNotFalse( has_action( 'load-site-editor.php', array( EditorSwitch::class, 'block_site_editor' ) ) );
+		$this->assertSame( 999, has_action( 'admin_bar_menu', array( EditorSwitch::class, 'remove_admin_bar_link' ) ) );
 	}
 }
