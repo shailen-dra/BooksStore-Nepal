@@ -132,6 +132,19 @@ class ContentTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Default', Content::rich( 'bsn_about_text', '<p>Default</p>' ) );
 	}
 
+	public function test_ids_keep_the_picked_order_and_drop_unpublished_or_non_products(): void {
+		$a     = self::factory()->post->create( array( 'post_type' => 'product', 'post_status' => 'publish' ) );
+		$b     = self::factory()->post->create( array( 'post_type' => 'product', 'post_status' => 'publish' ) );
+		$draft = self::factory()->post->create( array( 'post_type' => 'product', 'post_status' => 'draft' ) );
+		$page  = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+		update_field( 'bsn_new_books', array( (string) $b, (string) $draft, (string) $page, (string) $a, '999999' ), $this->front );
+		$this->assertSame( array( $b, $a ), Content::ids( 'bsn_new_books' ) );
+		update_field( 'bsn_new_books', '', $this->front );
+		$this->assertSame( array(), Content::ids( 'bsn_new_books' ) );
+		add_filter( 'bsn_acf_active', '__return_false' );
+		$this->assertSame( array(), Content::ids( 'bsn_new_books' ) );
+	}
+
 	public function test_schema_field_names_are_unique_prefixed_and_first_store_fields_match(): void {
 		$names = array();
 		foreach ( Fields::schema() as $group ) {

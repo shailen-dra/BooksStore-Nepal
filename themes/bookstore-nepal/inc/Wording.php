@@ -55,6 +55,16 @@ final class Wording {
 	}
 
 	/**
+	 * Books the owner picked for a slider, in order; empty means the slider fills itself.
+	 *
+	 * @param string $field Field name.
+	 * @return list<int>
+	 */
+	public static function ids( string $field ): array {
+		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::ids( $field ) : array();
+	}
+
+	/**
 	 * Makes owner HTML safe for output (the plugin's cleaner when it is active).
 	 *
 	 * @param string $html HTML.

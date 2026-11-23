@@ -115,6 +115,18 @@ class ContentFieldsTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'width', Fields::acf_group( 'home_hero' )['fields'][0], 'Schema width becomes ACF wrapper width.' );
 	}
 
+	public function test_each_slider_has_a_book_picker(): void {
+		$fields = array_column( Fields::acf_group( 'home_rows' )['fields'], null, 'name' );
+		foreach ( array( 'bsn_new_books', 'bsn_best_books' ) as $name ) {
+			$this->assertSame( 'relationship', $fields[ $name ]['type'] );
+			$this->assertSame( array( 'product' ), $fields[ $name ]['post_type'] );
+			$this->assertSame( array( 'publish' ), $fields[ $name ]['post_status'] );
+			$this->assertSame( 'id', $fields[ $name ]['return_format'] );
+			$this->assertSame( array( 'search' ), $fields[ $name ]['filters'] );
+			$this->assertSame( 12, $fields[ $name ]['max'] );
+		}
+	}
+
 	public function test_groups_hide_the_content_editor_and_register_on_acf_init(): void {
 		$this->assertContains( 'the_content', Fields::acf_group( 'home_hero' )['hide_on_screen'] );
 		Fields::register();

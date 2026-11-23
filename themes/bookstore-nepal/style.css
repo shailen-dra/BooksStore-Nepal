@@ -825,13 +825,13 @@ body {
 	.bsn-age-tile:hover .bsn-age-tile__age, .bsn-age-tile:focus-visible .bsn-age-tile__age { animation: bsn-wiggle 0.6s ease-in-out; }
 	.bsn-age-tile__age { display: inline-block; }
 
-	/* Book covers lift and tilt like a book being picked up */
-	.bsn-products .wc-block-components-product-image a,
-	.bsn-products .wc-block-components-product-image > .bsn-cover,
-	.bsn-products .wc-block-components-product-image > img { transition: translate 0.25s var(--bsn-bounce), rotate 0.25s var(--bsn-bounce); }
-	.bsn-products .wc-block-product:hover .wc-block-components-product-image a,
-	.bsn-products .wc-block-product:hover .wc-block-components-product-image > .bsn-cover,
-	.bsn-products .wc-block-product:hover .wc-block-components-product-image > img { translate: 0 -6px; rotate: -2deg; }
+	/* Book covers lift and tilt like a book being picked up (grids only; slider cards stay still) */
+	.bsn-products:not(.bsn-slider) .wc-block-components-product-image a,
+	.bsn-products:not(.bsn-slider) .wc-block-components-product-image > .bsn-cover,
+	.bsn-products:not(.bsn-slider) .wc-block-components-product-image > img { transition: translate 0.25s var(--bsn-bounce), rotate 0.25s var(--bsn-bounce); }
+	.bsn-products:not(.bsn-slider) .wc-block-product:hover .wc-block-components-product-image a,
+	.bsn-products:not(.bsn-slider) .wc-block-product:hover .wc-block-components-product-image > .bsn-cover,
+	.bsn-products:not(.bsn-slider) .wc-block-product:hover .wc-block-components-product-image > img { translate: 0 -6px; rotate: -2deg; }
 
 	/* Buttons and chips squish when pressed: works on phones too */
 	.wp-element-button, .wc-block-components-button, .bsn-gift-finder button, .bsn-chip, .bsn-slider-btn,

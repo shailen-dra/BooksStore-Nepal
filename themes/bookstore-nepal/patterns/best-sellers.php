@@ -37,15 +37,26 @@ echo Theme::slider_controls( Theme::slider_id( $bsn_slider ) );
 
 <?php
 // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Block markup built and escaped by Theme.
+// Books the owner picked, in their order; otherwise the slider fills itself.
+$bsn_picked = Wording::ids( 'bsn_best_books' );
+$bsn_query  = $bsn_picked
+	? array(
+		'orderBy'                       => 'post__in',
+		'order'                         => 'asc',
+		'perPage'                       => count( $bsn_picked ),
+		'woocommerceHandPickedProducts' => $bsn_picked,
+		'woocommerceStockStatus'        => array( 'instock' ),
+	)
+	: array(
+		'orderBy'                => 'popularity',
+		'order'                  => 'desc',
+		'woocommerceStockStatus' => array( 'instock' ),
+	);
 echo Theme::collection_markup(
 	array(
 		'query_id' => 4,
 		'slider'   => $bsn_slider,
-		'query'    => array(
-			'orderBy'                => 'popularity',
-			'order'                  => 'desc',
-			'woocommerceStockStatus' => array( 'instock' ),
-		),
+		'query'    => $bsn_query,
 	)
 );
 ?>

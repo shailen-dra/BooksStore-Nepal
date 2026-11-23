@@ -87,6 +87,24 @@ class Content {
 	}
 
 	/**
+	 * Picked product IDs in the owner's order, keeping only published products; empty when none are picked.
+	 *
+	 * @param string $field Field name.
+	 * @return list<int>
+	 */
+	public static function ids( string $field ): array {
+		$value = self::raw( $field );
+		$ids   = array();
+		foreach ( is_array( $value ) ? $value : array() as $id ) {
+			$id = (int) $id;
+			if ( $id > 0 && 'product' === get_post_type( $id ) && 'publish' === get_post_status( $id ) && ! in_array( $id, $ids, true ) ) {
+				$ids[] = $id;
+			}
+		}
+		return $ids;
+	}
+
+	/**
 	 * Safe owner HTML: script and style blocks go with their contents, inline styles are dropped (so
 	 * text pasted from Word or a web page cannot change the layout), then wp_kses_post.
 	 *
