@@ -100,6 +100,21 @@ class WordingPagesTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<summary>Q2</summary>', $html );
 	}
 
+	public function test_faq_answers_are_cleaned_like_rich_boxes(): void {
+		update_field( 'bsn_faq_items', array( array( 'heading' => '', 'question' => 'Q', 'answer' => '<p style="color:red">A</p><script>bad()</script>' ) ), $this->ids['faq'] );
+		$html = $this->render( 'faq' );
+		$this->assertStringContainsString( '>A</p>', $html );
+		$this->assertStringNotContainsString( 'bad()', $html );
+		$this->assertStringNotContainsString( 'color:red', $html );
+	}
+
+	public function test_default_links_follow_a_page_address_change(): void {
+		$this->set_permalink_structure( '/%postname%/' );
+		$this->assertStringContainsString( (string) get_permalink( $this->ids['delivery'] ), Wording::defaults()['bsn_faq_items'][0]['answer'] );
+		wp_update_post( array( 'ID' => $this->ids['delivery'], 'post_name' => 'shipping-info' ) );
+		$this->assertStringContainsString( 'shipping-info', Wording::defaults()['bsn_faq_items'][0]['answer'] );
+	}
+
 	public function test_client_text_replaces_default(): void {
 		update_field( 'bsn_about_text', '<p>Our own words</p>', $this->ids['about'] );
 		$html = $this->render( 'about' );

@@ -1,4 +1,6 @@
 <?php
+use BookstoreNepal\Content\Content;
+use BookstoreNepal\Content\EditorSwitch;
 use BookstoreNepal\Content\Fields;
 use BookstoreNepal\Content\Prefill;
 use BookstoreNepal\StorePages;
@@ -130,6 +132,48 @@ class PrefillTest extends WP_UnitTestCase {
 		Prefill::run();
 		$groups = array_column( $GLOBALS['bsn_acf_registered']['groups'], null, 'key' );
 		$this->assertSame( (string) $this->ids['faq'], $groups['group_bsn_faq']['location'][0][0]['value'] );
+	}
+
+	public function test_detached_multi_box_page_is_left_alone_and_keeps_the_block_editor(): void {
+		$own = '<!-- wp:paragraph --><p>Our own delivery page</p><!-- /wp:paragraph -->';
+		wp_update_post( array( 'ID' => $this->ids['delivery'], 'post_content' => $own ) );
+		Prefill::run();
+		$this->assertSame( $own, get_post( $this->ids['delivery'] )->post_content );
+		$this->assertStringNotContainsString( 'Our own delivery page', (string) get_field( 'bsn_delivery_intro', $this->ids['delivery'] ) );
+		$this->assertTrue( Content::is_detached( 'delivery' ) );
+		$this->assertNotContains( $this->ids['delivery'], Content::managed_page_ids() );
+		$this->assertTrue( EditorSwitch::filter_block_editor( true, get_post( $this->ids['delivery'] ) ) );
+		$this->assertSame( '0', Fields::acf_group( 'delivery' )['location'][0][0]['value'], 'Boxes hidden: they would not show on the page.' );
+	}
+
+	public function test_detached_single_box_page_whose_box_has_text_keeps_the_block_editor(): void {
+		$own = '<!-- wp:paragraph --><p>Rewritten</p><!-- /wp:paragraph -->';
+		wp_update_post( array( 'ID' => $this->ids['about'], 'post_content' => $own ) );
+		update_field( 'bsn_about_text', '<p>Box text</p>', $this->ids['about'] );
+		Prefill::run();
+		$this->assertSame( $own, get_post( $this->ids['about'] )->post_content );
+		$this->assertNotContains( $this->ids['about'], Content::managed_page_ids() );
+	}
+
+	public function test_image_only_page_is_adopted_not_wiped(): void {
+		wp_update_post( array( 'ID' => $this->ids['about'], 'post_content' => '<!-- wp:image --><figure class="wp-block-image"><img src="https://example.com/shop.jpg" alt="Our shop"/></figure><!-- /wp:image -->' ) );
+		Prefill::run();
+		$this->assertStringContainsString( 'shop.jpg', (string) get_field( 'bsn_about_text', $this->ids['about'] ) );
+		$this->assertFalse( Content::is_detached( 'about' ) );
+	}
+
+	public function test_setup_names_detached_pages_it_left_alone(): void {
+		wp_update_post( array( 'ID' => $this->ids['contact'], 'post_content' => '<p>Call us</p>' ) );
+		$this->assertSame( array( 'contact' ), Prefill::detached_pages() );
+	}
+
+	public function test_maybe_run_waits_when_no_defaults_are_available(): void {
+		remove_filter( 'bsn_content_defaults', array( Wording::class, 'defaults' ) );
+		Prefill::maybe_run();
+		$this->assertFalse( get_option( Prefill::OPTION ), 'Theme inactive: try again on a later request.' );
+		add_filter( 'bsn_content_defaults', array( Wording::class, 'defaults' ) );
+		Prefill::maybe_run();
+		$this->assertSame( Fields::VERSION, get_option( Prefill::OPTION ) );
 	}
 
 	public function test_registers_on_acf_init(): void {

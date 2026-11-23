@@ -14,11 +14,11 @@ use BookstoreNepal\Theme\Wording;
 defined( 'ABSPATH' ) || exit;
 ?>
 <!-- wp:group {"className":"bsn-info","layout":{"type":"constrained"}} -->
-<div class="wp-block-group bsn-info"><?php echo Wording::rich( 'bsn_contact_intro' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by wp_kses_post. ?>
+<div class="wp-block-group bsn-info"><?php echo Wording::rich( 'bsn_contact_intro' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by Wording::clean(). ?>
 
 <!-- wp:group {"className":"bsn-contact","layout":{"type":"default"}} -->
 <div class="wp-block-group bsn-contact"><!-- wp:pattern {"slug":"bookstore-nepal/contact-details"} /--></div>
 <!-- /wp:group -->
 
-<?php echo Wording::rich( 'bsn_contact_after' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by wp_kses_post. ?></div>
+<?php echo Wording::rich( 'bsn_contact_after' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by Wording::clean(). ?></div>
 <!-- /wp:group -->

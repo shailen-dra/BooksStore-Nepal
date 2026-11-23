@@ -34,6 +34,10 @@ class Prefill {
 		if ( ! Content::acf_active() || Fields::VERSION === get_option( self::OPTION ) ) {
 			return;
 		}
+		// No defaults (theme inactive, or wp --skip-themes): leave it for a later request.
+		if ( ! apply_filters( 'bsn_content_defaults', array() ) ) {
+			return;
+		}
 		self::run();
 		update_option( self::OPTION, Fields::VERSION, false );
 	}
@@ -73,49 +77,55 @@ class Prefill {
 	}
 
 	/**
-	 * Moves the text of detached store pages into their first box.
+	 * Store pages rewritten in the block editor. A page with a single box has its text moved into that
+	 * box (block markers removed) when the box is empty, and goes back to showing its box. A page with
+	 * several boxes (or a filled box) is left exactly as it is: splitting its text between boxes would be
+	 * guesswork. It keeps the block editor (see detached_pages()).
+	 *
+	 * Untouched pages holding our placeholder paragraph (the theme was inactive when they were made) are
+	 * switched to their pattern block.
 	 *
 	 * @return int Number of boxes written.
 	 */
 	private static function adopt_detached_pages(): int {
 		$written = 0;
-		$defs    = StorePages::definitions();
 		foreach ( Fields::schema() as $group ) {
 			if ( ! str_starts_with( $group['location'], 'page:' ) ) {
 				continue;
 			}
 			$key     = substr( $group['location'], 5 );
 			$post_id = Content::post_id_for( $group['location'] );
-			if ( ! is_int( $post_id ) || ! isset( $defs[ $key ] ) ) {
+			if ( ! is_int( $post_id ) ) {
 				continue;
 			}
 			// Compared with the literal pattern block: this runs on acf/init, before the theme's patterns
 			// are registered, when StorePages::content() would answer with its placeholder paragraph.
 			$pattern = StorePages::pattern_block( $key );
 			$content = trim( (string) get_post_field( 'post_content', $post_id ) );
-			$text    = Content::strip_block_comments( $content );
-			$first   = $group['fields'][0]['name'];
-			$ours    = array( $pattern, StorePages::content( $key, $defs[ $key ]['title'] ) );
-			if ( in_array( $content, $ours, true ) || '' === trim( wp_strip_all_tags( $text ) ) ) {
-				// Untouched (our pattern block, or our placeholder when the theme was inactive): show the boxes.
+			if ( ! Content::is_detached( $key ) ) {
 				if ( $pattern !== $content ) {
 					wp_update_post( array( 'ID' => $post_id, 'post_content' => $pattern ) );
 				}
 				continue;
 			}
-			if ( ! self::is_empty( get_field( $first, $post_id, false ) ) ) {
+			$first = $group['fields'][0]['name'];
+			if ( 1 !== count( $group['fields'] ) || ! self::is_empty( get_field( $first, $post_id, false ) ) ) {
 				continue;
 			}
-			update_field( $first, $text, $post_id );
-			wp_update_post(
-				array(
-					'ID'           => $post_id,
-					'post_content' => $pattern,
-				)
-			);
+			update_field( $first, Content::strip_block_comments( $content ), $post_id );
+			wp_update_post( array( 'ID' => $post_id, 'post_content' => $pattern ) );
 			++$written;
 		}
 		return $written;
+	}
+
+	/**
+	 * Keys of store pages that were rewritten in the block editor and still show their own blocks.
+	 *
+	 * @return list<string>
+	 */
+	public static function detached_pages(): array {
+		return array_values( array_filter( array_keys( StorePages::definitions() ), array( Content::class, 'is_detached' ) ) );
 	}
 
 	/**

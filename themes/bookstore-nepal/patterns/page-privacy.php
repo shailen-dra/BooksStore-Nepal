@@ -14,5 +14,5 @@ use BookstoreNepal\Theme\Wording;
 defined( 'ABSPATH' ) || exit;
 ?>
 <!-- wp:group {"className":"bsn-info","layout":{"type":"constrained"}} -->
-<div class="wp-block-group bsn-info"><?php echo Wording::rich( 'bsn_privacy_text' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by wp_kses_post. ?></div>
+<div class="wp-block-group bsn-info"><?php echo Wording::rich( 'bsn_privacy_text' ); // phpcs:ignore WordPress.Security.EscapeOutput -- made safe by Wording::clean(). ?></div>
 <!-- /wp:group -->

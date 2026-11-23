@@ -15,6 +15,13 @@ defined( 'ABSPATH' ) || exit;
 final class Wording {
 
 	/**
+	 * Store-page defaults for the current pages and addresses.
+	 *
+	 * @var array<string,array>
+	 */
+	private static array $pages = array();
+
+	/**
 	 * Default wording keyed by field name (see BookstoreNepal\Content\Fields::schema()).
 	 * Also handed to the plugin's pre-fill through the `bsn_content_defaults` filter.
 	 *
@@ -37,14 +44,23 @@ final class Wording {
 	}
 
 	/**
-	 * Rich text, already made safe (wp_kses_post).
+	 * Rich text, already made safe (clean()).
 	 *
 	 * @param string $field Field name.
 	 */
 	public static function rich( string $field ): string {
 		$default = self::default_of( $field );
 		$default = is_string( $default ) ? $default : '';
-		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::rich( $field, $default ) : wp_kses_post( wpautop( $default ) );
+		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::rich( $field, $default ) : self::clean( wpautop( $default ) );
+	}
+
+	/**
+	 * Makes owner HTML safe for output (the plugin's cleaner when it is active).
+	 *
+	 * @param string $html HTML.
+	 */
+	public static function clean( string $html ): string {
+		return class_exists( '\BookstoreNepal\Content\Content' ) ? \BookstoreNepal\Content\Content::clean_html( $html ) : wp_kses_post( $html );
 	}
 
 	/**
@@ -99,12 +115,18 @@ final class Wording {
 	 * @return array<string,string|array>
 	 */
 	private static function pages(): array {
+		// Built once per request for the same pages and addresses (a page view asks several times).
+		$state = md5( (string) wp_json_encode( array( get_option( 'permalink_structure' ), home_url(), array_map( static fn( $id ) => $id . ':' . get_post_field( 'post_name', $id ) . ':' . get_post_status( $id ), array_merge( array_map( static fn( $option ) => (int) get_option( $option ), Theme::PAGE_OPTIONS ), array( (int) get_option( 'woocommerce_shop_page_id' ) ) ) ) ) ) );
+		if ( isset( self::$pages[ $state ] ) ) {
+			return self::$pages[ $state ];
+		}
 		$out = array();
 		foreach ( array( 'about', 'contact', 'delivery', 'returns', 'privacy', 'terms', 'faq' ) as $page ) {
 			foreach ( (array) include __DIR__ . '/wording/' . $page . '.php' as $field => $items ) {
 				$out[ $field ] = 'bsn_faq_items' === $field ? $items : Theme::html( $items );
 			}
 		}
+		self::$pages = array( $state => $out );
 		return $out;
 	}
 

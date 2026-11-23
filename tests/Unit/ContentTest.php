@@ -26,7 +26,7 @@ class ContentTest extends WP_UnitTestCase {
 	}
 
 	private function store_page( string $key, string $status = 'publish' ): int {
-		$id = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => $status ) );
+		$id = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => $status, 'post_content' => StorePages::pattern_block( $key ) ) );
 		update_option( StorePages::definitions()[ $key ]['option'], $id );
 		return $id;
 	}
@@ -68,6 +68,29 @@ class ContentTest extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'iframe', $html );
 	}
 
+	public function test_clean_html_drops_script_and_style_with_their_contents(): void {
+		$html = Content::clean_html( '<p>Keep</p><script>alert(1)</script><style>body{display:none}</style><p>Also</p>' );
+		$this->assertStringContainsString( '<p>Keep</p>', $html );
+		$this->assertStringContainsString( '<p>Also</p>', $html );
+		$this->assertStringNotContainsString( 'alert', $html );
+		$this->assertStringNotContainsString( 'display:none', $html );
+	}
+
+	public function test_clean_html_drops_inline_styles_but_keeps_other_attributes(): void {
+		$html = Content::clean_html( '<p style="position:fixed;top:0">Hi <a href="https://example.com/" style="color:red">link</a> <span class="bsn-placeholder" style="font-size:40px">x</span></p>' );
+		$this->assertStringNotContainsString( 'style=', $html );
+		$this->assertStringContainsString( 'href="https://example.com/"', $html );
+		$this->assertStringContainsString( 'class="bsn-placeholder"', $html );
+	}
+
+	public function test_rich_uses_clean_html(): void {
+		$about = $this->store_page( 'about' );
+		update_field( 'bsn_about_text', '<p style="color:red">Hi</p><script>bad()</script>', $about );
+		$html = Content::rich( 'bsn_about_text', '' );
+		$this->assertStringNotContainsString( 'style=', $html );
+		$this->assertStringNotContainsString( 'bad()', $html );
+	}
+
 	public function test_rich_adds_paragraphs_to_plain_lines(): void {
 		$about = $this->store_page( 'about' );
 		update_field( 'bsn_about_text', "One\n\nTwo", $about );
@@ -94,6 +117,19 @@ class ContentTest extends WP_UnitTestCase {
 
 		update_field( 'bsn_faq_items', array( array( 'heading' => 'H', 'question' => '', 'answer' => '' ) ), $faq );
 		$this->assertSame( $defaults, Content::rows( 'bsn_faq_items', $defaults ) );
+	}
+
+	public function test_rows_treat_blank_paragraphs_as_empty(): void {
+		$faq      = $this->store_page( 'faq' );
+		$defaults = array( array( 'heading' => '', 'question' => 'DQ', 'answer' => 'DA' ) );
+		update_field( 'bsn_faq_items', array( array( 'heading' => '', 'question' => 'Q', 'answer' => '<p>&nbsp;</p>' ), array( 'heading' => '', 'question' => 'Q2', 'answer' => "<p>\xC2\xA0</p>" ) ), $faq );
+		$this->assertSame( $defaults, Content::rows( 'bsn_faq_items', $defaults ) );
+	}
+
+	public function test_rich_treats_blank_paragraphs_as_empty(): void {
+		$about = $this->store_page( 'about' );
+		update_field( 'bsn_about_text', '<p>&nbsp;</p>', $about );
+		$this->assertStringContainsString( 'Default', Content::rich( 'bsn_about_text', '<p>Default</p>' ) );
 	}
 
 	public function test_schema_field_names_are_unique_prefixed_and_first_store_fields_match(): void {

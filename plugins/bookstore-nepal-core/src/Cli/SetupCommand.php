@@ -100,6 +100,9 @@ class SetupCommand {
 			\WP_CLI::warning( 'ACF Pro is not active, so the wording fields were not filled. Install and activate ACF Pro, then run wp bsn setup again.' );
 		} else {
 			\WP_CLI::log( sprintf( 'Wording fields: %d filled', $this->wording_filled ) );
+			foreach ( \BookstoreNepal\Content\Prefill::detached_pages() as $key ) {
+				\WP_CLI::log( sprintf( 'Page %s: rewritten in the block editor, so it keeps its own blocks and the block editor; its wording boxes are hidden. Check the page.', $key ) );
+			}
 		}
 		if ( $this->page_report && ! StorePages::pattern_available() ) {
 			\WP_CLI::warning( 'The Bookstore Nepal theme is not active, so the store information pages got a short placeholder paragraph instead of their text. Activate the theme, then delete those pages (or their stored IDs) and run setup again, or write the text in the page editor.' );

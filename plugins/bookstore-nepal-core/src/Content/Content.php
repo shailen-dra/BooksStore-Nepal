@@ -75,15 +75,32 @@ class Content {
 	}
 
 	/**
-	 * Rich text from a field, or the default, always through wpautop and wp_kses_post.
+	 * Rich text from a field, or the default, always through wpautop and clean_html().
 	 *
 	 * @param string $field        Field name.
 	 * @param string $default_html Default HTML.
 	 */
 	public static function rich( string $field, string $default_html ): string {
 		$value = self::raw( $field );
-		$html  = is_string( $value ) && '' !== trim( wp_strip_all_tags( $value ) ) ? $value : $default_html;
-		return wp_kses_post( wpautop( $html ) );
+		$html  = is_string( $value ) && ! self::blank( $value ) ? $value : $default_html;
+		return self::clean_html( wpautop( $html ) );
+	}
+
+	/**
+	 * Safe owner HTML: script and style blocks go with their contents, inline styles are dropped (so
+	 * text pasted from Word or a web page cannot change the layout), then wp_kses_post.
+	 *
+	 * @param string $html HTML.
+	 */
+	public static function clean_html( string $html ): string {
+		$html    = (string) preg_replace( '#<(script|style)\b[^>]*>.*?</\1\s*>#is', '', $html );
+		$allowed = wp_kses_allowed_html( 'post' );
+		foreach ( $allowed as $tag => $attrs ) {
+			if ( is_array( $attrs ) ) {
+				unset( $allowed[ $tag ]['style'] );
+			}
+		}
+		return wp_kses( $html, $allowed );
 	}
 
 	/**
@@ -102,7 +119,7 @@ class Content {
 				continue;
 			}
 			$clean = array_map( static fn( $v ) => is_string( $v ) ? trim( $v ) : '', $row );
-			if ( '' !== ( $clean['question'] ?? '' ) && '' !== ( $clean['answer'] ?? '' ) ) {
+			if ( ! self::blank( $clean['question'] ?? '' ) && ! self::blank( $clean['answer'] ?? '' ) ) {
 				$rows[] = $clean + array( 'heading' => '' );
 			}
 		}
@@ -110,13 +127,33 @@ class Content {
 	}
 
 	/**
-	 * IDs of the pages whose wording is edited through fields: the front page and every store page.
+	 * Whether a store page was rewritten in the block editor: its content is something other than its
+	 * pattern block, our placeholder paragraph, or nothing. Such a page shows its own blocks, not its boxes.
+	 *
+	 * @param string $key StorePages key.
+	 */
+	public static function is_detached( string $key ): bool {
+		$defs = StorePages::definitions();
+		$id   = self::post_id_for( 'page:' . $key );
+		if ( ! is_int( $id ) || ! isset( $defs[ $key ] ) ) {
+			return false;
+		}
+		$content = trim( (string) get_post_field( 'post_content', $id ) );
+		return ! in_array( $content, array( '', StorePages::pattern_block( $key ), StorePages::content( $key, $defs[ $key ]['title'] ) ), true );
+	}
+
+	/**
+	 * IDs of the pages whose wording is edited through fields: the front page and every store page that
+	 * still shows its boxes (not one rewritten in the block editor).
 	 *
 	 * @return list<int>
 	 */
 	public static function managed_page_ids(): array {
 		$ids = array();
 		foreach ( array_merge( array( 'front_page' ), array_map( static fn( $k ) => 'page:' . $k, array_keys( StorePages::definitions() ) ) ) as $location ) {
+			if ( str_starts_with( $location, 'page:' ) && self::is_detached( substr( $location, 5 ) ) ) {
+				continue;
+			}
 			$id = self::post_id_for( $location );
 			if ( is_int( $id ) ) {
 				$ids[] = $id;
@@ -132,6 +169,19 @@ class Content {
 	 */
 	public static function strip_block_comments( string $html ): string {
 		return trim( (string) preg_replace( '/<!--\s*\/?wp:[^>]*?-->\s*/', '', $html ) );
+	}
+
+	/**
+	 * Whether text has no visible words: tags, spaces and non-breaking spaces only. An image counts as content.
+	 *
+	 * @param string $html Text or HTML.
+	 */
+	public static function blank( string $html ): bool {
+		if ( preg_match( '/<(img|iframe|video|audio|embed)\b/i', $html ) ) {
+			return false;
+		}
+		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return '' === trim( str_replace( "\xC2\xA0", ' ', $text ) );
 	}
 
 	/**

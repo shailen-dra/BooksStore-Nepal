@@ -16,7 +16,7 @@ class ContentFieldsTest extends WP_UnitTestCase {
 			'pages'  => array(),
 		);
 		foreach ( StorePages::definitions() as $key => $def ) {
-			$this->ids[ $key ] = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish' ) );
+			$this->ids[ $key ] = self::factory()->post->create( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_content' => StorePages::pattern_block( $key ) ) );
 			update_option( $def['option'], $this->ids[ $key ] );
 		}
 	}
@@ -43,7 +43,7 @@ class ContentFieldsTest extends WP_UnitTestCase {
 	}
 
 	public function test_home_group_targets_front_page_type(): void {
-		$rule = Fields::acf_group( 'home' )['location'][0][0];
+		$rule = Fields::acf_group( 'home_hero' )['location'][0][0];
 		$this->assertSame( 'page_type', $rule['param'] );
 		$this->assertSame( 'front_page', $rule['value'] );
 	}
@@ -91,8 +91,32 @@ class ContentFieldsTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'WooCommerce › Settings › General', reset( $messages )['message'] );
 	}
 
+	public function test_home_page_is_split_into_numbered_boxed_sections_in_page_order(): void {
+		$keys = array( 'home_hero', 'home_ages', 'home_rows', 'home_gift', 'home_trust' );
+		$this->assertSame( $keys, array_values( array_filter( array_keys( Fields::schema() ), static fn( $k ) => str_starts_with( $k, 'home_' ) ) ) );
+		foreach ( $keys as $i => $key ) {
+			$group = Fields::acf_group( $key );
+			$this->assertStringStartsWith( ( $i + 1 ) . '. ', $group['title'] );
+			$this->assertSame( 'default', $group['style'], 'A boxed panel with its own title and collapse arrow.' );
+			$this->assertSame( $i, $group['menu_order'] );
+			$this->assertSame( 'front_page', $group['location'][0][0]['value'] );
+		}
+	}
+
+	public function test_related_boxes_sit_side_by_side(): void {
+		$widths = array();
+		foreach ( Fields::acf_group( 'home_hero' )['fields'] as $field ) {
+			$widths[ $field['name'] ] = $field['wrapper']['width'] ?? '';
+		}
+		$this->assertSame( '50', $widths['bsn_hero_button_ages'] );
+		$this->assertSame( '50', $widths['bsn_hero_button_gift'] );
+		$this->assertSame( '33', $widths['bsn_hero_book_1'] );
+		$this->assertSame( '', $widths['bsn_hero_lead'], 'Long text keeps the full width.' );
+		$this->assertArrayNotHasKey( 'width', Fields::acf_group( 'home_hero' )['fields'][0], 'Schema width becomes ACF wrapper width.' );
+	}
+
 	public function test_groups_hide_the_content_editor_and_register_on_acf_init(): void {
-		$this->assertContains( 'the_content', Fields::acf_group( 'home' )['hide_on_screen'] );
+		$this->assertContains( 'the_content', Fields::acf_group( 'home_hero' )['hide_on_screen'] );
 		Fields::register();
 		$this->assertNotFalse( has_action( 'acf/init', array( Fields::class, 'register_groups' ) ) );
 	}
