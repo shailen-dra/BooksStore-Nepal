@@ -167,7 +167,9 @@ Customers enter the code in the cart or at checkout. To stop a code, open it in 
 
 ## 6. Change the featured books on the home page
 
-The home page has a section called **Our favourites** that shows books you have marked as featured (starred). It shows up to eight. The **New arrivals** section next to it fills in automatically with your newest books; you do not need to manage that one. The **Best sellers** section is automatic too: it shows the eight in-stock books that have sold the most copies, so there is nothing to set up for it.
+The home page has a section called **Our favourites** that shows books you have marked as featured (starred). It shows up to eight. The **New arrivals** and **Best sellers** sliders fill themselves: New arrivals shows your newest books, and Best sellers shows the in-stock books that have sold the most copies.
+
+**Choosing the books in a slider yourself.** Go to **Pages › Home**, open section **3. Book rows**, and find **New arrivals: choose books** or **Best sellers: choose books**. Type in the search box or scroll the list on the left, and click a book to add it to the list on the right (up to 12). Drag books on the right to change their order, and click the minus next to a book to remove it. Click **Update**. The slider then shows exactly those books, in that order. Remove all of them to go back to the automatic list. Best sellers hides a picked book while it is out of stock.
 
 1. Go to **Products › All Products**.
 2. Look at the star column (the column with a star at the top). A filled blue star means the book is featured. An empty star means it is not.

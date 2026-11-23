@@ -31,7 +31,7 @@ class WordingTest extends WP_UnitTestCase {
 		$names = array();
 		foreach ( $groups as $key ) {
 			foreach ( Fields::schema()[ $key ]['fields'] as $field ) {
-				if ( 'message' !== $field['type'] ) {
+				if ( ! in_array( $field['type'], array( 'message', 'relationship' ), true ) ) {
 					$names[] = $field['name'];
 				}
 			}
@@ -72,6 +72,22 @@ class WordingTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'we’ll show books they’ll love.', $this->render_pattern( 'gift-finder' ) );
 		$this->assertStringContainsString( 'Delivery all over Nepal', $this->render_pattern( 'trust-strip' ) );
 		$this->assertStringContainsString( '<strong>Help</strong>', $this->render_pattern( 'footer-help' ) );
+	}
+
+	public function test_sliders_show_picked_books_in_order_else_fill_themselves(): void {
+		foreach ( array( 'new-arrivals' => array( 'bsn_new_books', '"orderBy":"date"' ), 'best-sellers' => array( 'bsn_best_books', '"orderBy":"popularity"' ) ) as $slug => $case ) {
+			$auto = $this->render_pattern( $slug );
+			$this->assertStringContainsString( $case[1], $auto, $slug );
+			$this->assertStringContainsString( '"woocommerceHandPickedProducts":[]', $auto, $slug );
+
+			$a = self::factory()->post->create( array( 'post_type' => 'product', 'post_status' => 'publish' ) );
+			$b = self::factory()->post->create( array( 'post_type' => 'product', 'post_status' => 'publish' ) );
+			update_field( $case[0], array( (string) $b, (string) $a ), $this->front );
+			$picked = $this->render_pattern( $slug );
+			$this->assertStringContainsString( '"woocommerceHandPickedProducts":[' . $b . ',' . $a . ']', $picked, $slug );
+			$this->assertStringContainsString( '"orderBy":"post__in"', $picked, $slug );
+			$this->assertStringContainsString( '"perPage":2', $picked, $slug );
+		}
 	}
 
 	public function test_footer_reads_shop_settings(): void {

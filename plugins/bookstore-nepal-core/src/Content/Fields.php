@@ -62,8 +62,10 @@ class Fields {
 				'fields'   => array(
 					$text( 'bsn_new_heading', __( 'New arrivals: heading', 'bookstore-nepal' ), __( 'The newest books, filled in by themselves.', 'bookstore-nepal' ), '50' ),
 					$text( 'bsn_new_more', __( 'New arrivals: "see all" link', 'bookstore-nepal' ), '', '50' ),
+					self::picker( 'bsn_new_books', __( 'New arrivals: choose books (optional)', 'bookstore-nepal' ), __( 'Pick up to 12 books and drag them into the order you want. Leave empty to show the newest books automatically.', 'bookstore-nepal' ) ),
 					$text( 'bsn_best_heading', __( 'Best sellers: heading', 'bookstore-nepal' ), __( 'The books that sold most, filled in by themselves.', 'bookstore-nepal' ), '50' ),
 					$text( 'bsn_best_more', __( 'Best sellers: "see all" link', 'bookstore-nepal' ), '', '50' ),
+					self::picker( 'bsn_best_books', __( 'Best sellers: choose books (optional)', 'bookstore-nepal' ), __( 'Pick up to 12 books and drag them into the order you want. Leave empty to show the best-selling books automatically. Books that are out of stock are hidden.', 'bookstore-nepal' ) ),
 					$text( 'bsn_featured_heading', __( 'Favourites: heading', 'bookstore-nepal' ), __( 'The books starred as "featured" in Products.', 'bookstore-nepal' ), '50' ),
 					$text( 'bsn_featured_more', __( 'Favourites: "see all" link', 'bookstore-nepal' ), '', '50' ),
 				),
@@ -261,6 +263,29 @@ class Fields {
 			$field['sub_fields']   = array_map( static fn( array $sub ): array => self::acf_field( $sub, $field['key'] . '_' ), $f['sub_fields'] );
 		}
 		return $field;
+	}
+
+	/**
+	 * A book picker for a slider: published products, searchable, up to 12, stored as IDs in order.
+	 *
+	 * @param string $name  Field name.
+	 * @param string $label Label.
+	 * @param string $hint  Instructions.
+	 * @return array<string,mixed>
+	 */
+	private static function picker( string $name, string $label, string $hint ): array {
+		return array(
+			'name'          => $name,
+			'label'         => $label,
+			'type'          => 'relationship',
+			'instructions'  => $hint,
+			'post_type'     => array( 'product' ),
+			'post_status'   => array( 'publish' ),
+			'filters'       => array( 'search' ),
+			'elements'      => array( 'featured_image' ),
+			'return_format' => 'id',
+			'max'           => 12,
+		);
 	}
 
 	/**

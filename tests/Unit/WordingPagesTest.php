@@ -32,7 +32,7 @@ class WordingPagesTest extends WP_UnitTestCase {
 		$names = array();
 		foreach ( Fields::schema() as $group ) {
 			foreach ( $group['fields'] as $field ) {
-				if ( 'message' !== $field['type'] ) {
+				if ( ! in_array( $field['type'], array( 'message', 'relationship' ), true ) ) {
 					$names[] = $field['name'];
 				}
 			}
