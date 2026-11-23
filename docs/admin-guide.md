@@ -14,6 +14,8 @@ Contents:
 6. [Change the featured books on the home page](#6-change-the-featured-books-on-the-home-page)
 7. [Change delivery rates](#7-change-delivery-rates)
 8. [Shop information pages](#8-shop-information-pages)
+9. [Change the home page wording](#9-change-the-home-page-wording)
+10. [Shop settings (footer)](#10-shop-settings-footer)
 
 ---
 
@@ -211,15 +213,48 @@ Your shop has seven information pages: **About us**, **Contact us**, **Delivery 
 
 Anything you have not filled in shows as a bracketed `[CLIENT ...]` note, so gaps are easy to spot. Search your live site for "CLIENT" before you launch.
 
-**Changing the wording.** Each page's text comes from the theme, so it is translatable and the delivery charges stay up to date by themselves. To rewrite a page:
+**Changing the wording.** Each page opens as a simple form, not the block editor. The boxes are already filled with the current wording, so you only change what you want.
 
-1. Go to **Pages** and open the page.
-2. Click the text once, then click the three-dot menu in the block toolbar and choose **Detach**. (The page is a single "pattern" block.)
-3. Edit the text like any other page and click **Update**.
+1. Go to **Pages** and open the page (for example **About us**).
+2. Change the text in the box. The toolbar has bold, italic, lists, links and so on, like a word processor.
+3. Click **Update**, then **View Page** to check it.
 
-A detached page no longer follows theme updates. On the Delivery page the live charges are a separate block, so they keep updating after you detach the page: leave that block in place. Pages you have published or edited are never overwritten when `wp bsn setup` is run again.
+Some pages have more than one box, because a part of the page fills itself in and sits between them:
+
+- **Delivery information**: the table of delivery charges sits between the first two boxes, and the ways to pay sit between the second and third. Change the charges in **WooCommerce › Settings › Shipping** (section 7), not in the text.
+- **Contact us**: your phone, WhatsApp, email and address sit between the two boxes. Change them in **WooCommerce › Settings › General** (above).
+
+**Frequently asked questions** is a list. Each item has an optional **Heading above this question** (to start a group such as "Choosing books"), a **Question** and an **Answer**. Click **Add a question** at the bottom to add one, drag an item by its left edge to reorder, and use the minus button on its right to remove it. A question shows only when it has both a question and an answer.
+
+![The Frequently asked questions page](admin-guide/11-faq.png)
+
+If you empty a box completely, the website shows the original wording again, so a page is never left blank.
+
+Links inside the text (for example to **Track your order**) point at those pages' current web addresses. If you ever change a page's web address (the **Permalink** under its title), update the links that point to it.
 
 **Review before launch.** The Privacy policy, Terms & conditions and Returns & refunds pages are drafts of ordinary wording, not legal advice. Fill in every `[CLIENT ...]` item (return period, refund timing, VAT, how long you keep records) and have them read by the shop owner and, ideally, a lawyer before the shop goes live.
+
+## 9. Change the home page wording
+
+All the words on the home page are in one form.
+
+1. Go to **Pages** and open **Home**.
+2. Change any box: the headline, the text under it, the two button labels, the titles on the three drawn books, the three **Shop by age** tiles, the section headings and "see all" links, the gift finder, and the delivery line in the dark strip near the bottom.
+3. Click **Update**, then **View Page** to check it.
+
+Which books appear in each section is still automatic (see section 6), and the ways to pay in the dark strip update by themselves when you turn a payment method on or off.
+
+Keep the headline and the book titles short so they fit nicely on phones. An empty box shows the original wording again.
+
+![The Home page form](admin-guide/10-home-wording.png)
+
+## 10. Shop settings (footer)
+
+Go to **Shop settings** in the left menu to change the line under the shop name in the footer and the heading above the help links. Click **Save Changes** when done.
+
+Your phone, WhatsApp, email and address are not here: they are in **WooCommerce › Settings › General** (section 8), so you only type them in one place.
+
+![Shop settings](admin-guide/12-shop-settings.png)
 
 ---
 
