@@ -34,6 +34,10 @@ class Prefill {
 		if ( ! Content::acf_active() || Fields::VERSION === get_option( self::OPTION ) ) {
 			return;
 		}
+		// No defaults (theme inactive, or wp --skip-themes): leave it for a later request.
+		if ( ! apply_filters( 'bsn_content_defaults', array() ) ) {
+			return;
+		}
 		self::run();
 		update_option( self::OPTION, Fields::VERSION, false );
 	}

@@ -119,6 +119,19 @@ class ContentTest extends WP_UnitTestCase {
 		$this->assertSame( $defaults, Content::rows( 'bsn_faq_items', $defaults ) );
 	}
 
+	public function test_rows_treat_blank_paragraphs_as_empty(): void {
+		$faq      = $this->store_page( 'faq' );
+		$defaults = array( array( 'heading' => '', 'question' => 'DQ', 'answer' => 'DA' ) );
+		update_field( 'bsn_faq_items', array( array( 'heading' => '', 'question' => 'Q', 'answer' => '<p>&nbsp;</p>' ), array( 'heading' => '', 'question' => 'Q2', 'answer' => "<p>\xC2\xA0</p>" ) ), $faq );
+		$this->assertSame( $defaults, Content::rows( 'bsn_faq_items', $defaults ) );
+	}
+
+	public function test_rich_treats_blank_paragraphs_as_empty(): void {
+		$about = $this->store_page( 'about' );
+		update_field( 'bsn_about_text', '<p>&nbsp;</p>', $about );
+		$this->assertStringContainsString( 'Default', Content::rich( 'bsn_about_text', '<p>Default</p>' ) );
+	}
+
 	public function test_schema_field_names_are_unique_prefixed_and_first_store_fields_match(): void {
 		$names = array();
 		foreach ( Fields::schema() as $group ) {

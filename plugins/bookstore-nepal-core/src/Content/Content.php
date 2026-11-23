@@ -82,7 +82,7 @@ class Content {
 	 */
 	public static function rich( string $field, string $default_html ): string {
 		$value = self::raw( $field );
-		$html  = is_string( $value ) && '' !== trim( wp_strip_all_tags( $value ) ) ? $value : $default_html;
+		$html  = is_string( $value ) && ! self::blank( $value ) ? $value : $default_html;
 		return self::clean_html( wpautop( $html ) );
 	}
 
@@ -119,7 +119,7 @@ class Content {
 				continue;
 			}
 			$clean = array_map( static fn( $v ) => is_string( $v ) ? trim( $v ) : '', $row );
-			if ( '' !== ( $clean['question'] ?? '' ) && '' !== ( $clean['answer'] ?? '' ) ) {
+			if ( ! self::blank( $clean['question'] ?? '' ) && ! self::blank( $clean['answer'] ?? '' ) ) {
 				$rows[] = $clean + array( 'heading' => '' );
 			}
 		}
@@ -169,6 +169,19 @@ class Content {
 	 */
 	public static function strip_block_comments( string $html ): string {
 		return trim( (string) preg_replace( '/<!--\s*\/?wp:[^>]*?-->\s*/', '', $html ) );
+	}
+
+	/**
+	 * Whether text has no visible words: tags, spaces and non-breaking spaces only. An image counts as content.
+	 *
+	 * @param string $html Text or HTML.
+	 */
+	public static function blank( string $html ): bool {
+		if ( preg_match( '/<(img|iframe|video|audio|embed)\b/i', $html ) ) {
+			return false;
+		}
+		$text = html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return '' === trim( str_replace( "\xC2\xA0", ' ', $text ) );
 	}
 
 	/**

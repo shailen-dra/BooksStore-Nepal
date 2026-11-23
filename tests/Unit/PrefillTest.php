@@ -167,6 +167,15 @@ class PrefillTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'contact' ), Prefill::detached_pages() );
 	}
 
+	public function test_maybe_run_waits_when_no_defaults_are_available(): void {
+		remove_filter( 'bsn_content_defaults', array( Wording::class, 'defaults' ) );
+		Prefill::maybe_run();
+		$this->assertFalse( get_option( Prefill::OPTION ), 'Theme inactive: try again on a later request.' );
+		add_filter( 'bsn_content_defaults', array( Wording::class, 'defaults' ) );
+		Prefill::maybe_run();
+		$this->assertSame( Fields::VERSION, get_option( Prefill::OPTION ) );
+	}
+
 	public function test_registers_on_acf_init(): void {
 		Prefill::register();
 		$this->assertSame( 20, has_action( 'acf/init', array( Prefill::class, 'maybe_run' ) ) );
