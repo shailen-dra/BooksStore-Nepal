@@ -236,10 +236,18 @@ Links inside the text (for example to **Track your order**) point at those pages
 
 ## 9. Change the home page wording
 
-All the words on the home page are in one form.
+All the words on the home page are in one form, split into numbered sections in the order they appear on the page:
+
+1. **Top of the page**: the small label, the headline, the text under it, the two button labels and the titles on the three drawn books.
+2. **Shop by age**: the heading and the name and description of each age tile.
+3. **Book rows**: the heading and "see all" link of New arrivals, Best sellers and Our favourites.
+4. **Gift finder**: its heading and text.
+5. **Dark strip near the bottom**: the delivery line.
+
+To change something:
 
 1. Go to **Pages** and open **Home**.
-2. Change any box: the headline, the text under it, the two button labels, the titles on the three drawn books, the three **Shop by age** tiles, the section headings and "see all" links, the gift finder, and the delivery line in the dark strip near the bottom.
+2. Find the section and change the box. Click a section's title bar to fold it away if you want less on screen.
 3. Click **Update**, then **View Page** to check it.
 
 Which books appear in each section is still automatic (see section 6), and the ways to pay in the dark strip update by themselves when you turn a payment method on or off.

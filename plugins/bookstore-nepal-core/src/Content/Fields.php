@@ -24,39 +24,63 @@ class Fields {
 	 * @return array<string,array{title:string,location:string,fields:list<array<string,mixed>>}>
 	 */
 	public static function schema(): array {
-		$text     = static fn( string $name, string $label, string $hint = '' ): array => self::field( $name, $label, 'text', $hint );
-		$textarea = static fn( string $name, string $label, string $hint = '' ): array => self::field( $name, $label, 'textarea', $hint );
-		$rich     = static fn( string $name, string $label, string $hint = '' ): array => self::field( $name, $label, 'wysiwyg', $hint );
+		$text = static fn( string $name, string $label, string $hint = '', string $width = '' ): array => self::field( $name, $label, 'text', $hint, $width );
+		$textarea = static fn( string $name, string $label, string $hint = '', string $width = '' ): array => self::field( $name, $label, 'textarea', $hint, $width );
+		$rich = static fn( string $name, string $label, string $hint = '', string $width = '' ): array => self::field( $name, $label, 'wysiwyg', $hint, $width );
 
 		return array(
-			'home'     => array(
-				'title'    => __( 'Home page wording', 'bookstore-nepal' ),
+			'home_hero'  => array(
+				'title'    => __( '1. Top of the page', 'bookstore-nepal' ),
 				'location' => 'front_page',
 				'fields'   => array(
-					$text( 'bsn_hero_pill', __( 'Small label above the headline', 'bookstore-nepal' ) ),
-					$text( 'bsn_hero_headline', __( 'Headline', 'bookstore-nepal' ), __( 'The big words at the top of the home page.', 'bookstore-nepal' ) ),
+					$text( 'bsn_hero_pill', __( 'Small label above the headline', 'bookstore-nepal' ), '', '35' ),
+					$text( 'bsn_hero_headline', __( 'Headline', 'bookstore-nepal' ), __( 'The big words at the top of the home page.', 'bookstore-nepal' ), '65' ),
 					$textarea( 'bsn_hero_lead', __( 'Text under the headline', 'bookstore-nepal' ) ),
-					$text( 'bsn_hero_button_ages', __( 'First button', 'bookstore-nepal' ), __( 'Takes visitors to the "Shop by age" tiles.', 'bookstore-nepal' ) ),
-					$text( 'bsn_hero_button_gift', __( 'Second button', 'bookstore-nepal' ), __( 'Takes visitors to the gift finder.', 'bookstore-nepal' ) ),
-					$text( 'bsn_hero_book_1', __( 'Picture book 1 title', 'bookstore-nepal' ), __( 'The three drawn books beside the headline. Keep the titles short.', 'bookstore-nepal' ) ),
-					$text( 'bsn_hero_book_2', __( 'Picture book 2 title', 'bookstore-nepal' ) ),
-					$text( 'bsn_hero_book_3', __( 'Picture book 3 title', 'bookstore-nepal' ) ),
-					$text( 'bsn_ages_heading', __( '"Shop by age" heading', 'bookstore-nepal' ) ),
-					$text( 'bsn_age_0_3_title', __( 'Ages 0–3: name', 'bookstore-nepal' ) ),
-					$text( 'bsn_age_0_3_text', __( 'Ages 0–3: description', 'bookstore-nepal' ) ),
-					$text( 'bsn_age_4_7_title', __( 'Ages 4–7: name', 'bookstore-nepal' ) ),
-					$text( 'bsn_age_4_7_text', __( 'Ages 4–7: description', 'bookstore-nepal' ) ),
-					$text( 'bsn_age_8_12_title', __( 'Ages 8–12: name', 'bookstore-nepal' ) ),
-					$text( 'bsn_age_8_12_text', __( 'Ages 8–12: description', 'bookstore-nepal' ) ),
-					$text( 'bsn_new_heading', __( 'New arrivals: heading', 'bookstore-nepal' ) ),
-					$text( 'bsn_new_more', __( 'New arrivals: "see all" link', 'bookstore-nepal' ) ),
-					$text( 'bsn_best_heading', __( 'Best sellers: heading', 'bookstore-nepal' ) ),
-					$text( 'bsn_best_more', __( 'Best sellers: "see all" link', 'bookstore-nepal' ) ),
-					$text( 'bsn_featured_heading', __( 'Favourites: heading', 'bookstore-nepal' ), __( 'The books shown here are the ones starred as "featured" in Products.', 'bookstore-nepal' ) ),
-					$text( 'bsn_featured_more', __( 'Favourites: "see all" link', 'bookstore-nepal' ) ),
-					$text( 'bsn_gift_heading', __( 'Gift finder: heading', 'bookstore-nepal' ) ),
-					$textarea( 'bsn_gift_text', __( 'Gift finder: text', 'bookstore-nepal' ) ),
-					$text( 'bsn_trust_delivery', __( 'Dark strip near the bottom: delivery line', 'bookstore-nepal' ), __( 'The ways to pay in this strip update by themselves.', 'bookstore-nepal' ) ),
+					$text( 'bsn_hero_button_ages', __( 'First button', 'bookstore-nepal' ), __( 'Takes visitors to the "Shop by age" tiles.', 'bookstore-nepal' ), '50' ),
+					$text( 'bsn_hero_button_gift', __( 'Second button', 'bookstore-nepal' ), __( 'Takes visitors to the gift finder.', 'bookstore-nepal' ), '50' ),
+					$text( 'bsn_hero_book_1', __( 'Drawn book 1', 'bookstore-nepal' ), __( 'The three drawn books beside the headline. Keep the titles short.', 'bookstore-nepal' ), '33' ),
+					$text( 'bsn_hero_book_2', __( 'Drawn book 2', 'bookstore-nepal' ), '', '33' ),
+					$text( 'bsn_hero_book_3', __( 'Drawn book 3', 'bookstore-nepal' ), '', '33' ),
+				),
+			),
+			'home_ages'  => array(
+				'title'    => __( '2. Shop by age', 'bookstore-nepal' ),
+				'location' => 'front_page',
+				'fields'   => array(
+					$text( 'bsn_ages_heading', __( 'Heading', 'bookstore-nepal' ) ),
+					$text( 'bsn_age_0_3_title', __( 'Ages 0–3: name', 'bookstore-nepal' ), '', '40' ),
+					$text( 'bsn_age_0_3_text', __( 'Ages 0–3: description', 'bookstore-nepal' ), '', '60' ),
+					$text( 'bsn_age_4_7_title', __( 'Ages 4–7: name', 'bookstore-nepal' ), '', '40' ),
+					$text( 'bsn_age_4_7_text', __( 'Ages 4–7: description', 'bookstore-nepal' ), '', '60' ),
+					$text( 'bsn_age_8_12_title', __( 'Ages 8–12: name', 'bookstore-nepal' ), '', '40' ),
+					$text( 'bsn_age_8_12_text', __( 'Ages 8–12: description', 'bookstore-nepal' ), '', '60' ),
+				),
+			),
+			'home_rows'  => array(
+				'title'    => __( '3. Book rows', 'bookstore-nepal' ),
+				'location' => 'front_page',
+				'fields'   => array(
+					$text( 'bsn_new_heading', __( 'New arrivals: heading', 'bookstore-nepal' ), __( 'The newest books, filled in by themselves.', 'bookstore-nepal' ), '50' ),
+					$text( 'bsn_new_more', __( 'New arrivals: "see all" link', 'bookstore-nepal' ), '', '50' ),
+					$text( 'bsn_best_heading', __( 'Best sellers: heading', 'bookstore-nepal' ), __( 'The books that sold most, filled in by themselves.', 'bookstore-nepal' ), '50' ),
+					$text( 'bsn_best_more', __( 'Best sellers: "see all" link', 'bookstore-nepal' ), '', '50' ),
+					$text( 'bsn_featured_heading', __( 'Favourites: heading', 'bookstore-nepal' ), __( 'The books starred as "featured" in Products.', 'bookstore-nepal' ), '50' ),
+					$text( 'bsn_featured_more', __( 'Favourites: "see all" link', 'bookstore-nepal' ), '', '50' ),
+				),
+			),
+			'home_gift'  => array(
+				'title'    => __( '4. Gift finder', 'bookstore-nepal' ),
+				'location' => 'front_page',
+				'fields'   => array(
+					$text( 'bsn_gift_heading', __( 'Heading', 'bookstore-nepal' ), '', '40' ),
+					$textarea( 'bsn_gift_text', __( 'Text', 'bookstore-nepal' ), '', '60' ),
+				),
+			),
+			'home_trust' => array(
+				'title'    => __( '5. Dark strip near the bottom', 'bookstore-nepal' ),
+				'location' => 'front_page',
+				'fields'   => array(
+					$text( 'bsn_trust_delivery', __( 'Delivery line', 'bookstore-nepal' ), __( 'The ways to pay in this strip update by themselves.', 'bookstore-nepal' ) ),
 				),
 			),
 			'about'    => array(
@@ -183,7 +207,8 @@ class Fields {
 			'fields'         => array_map( static fn( array $f ): array => self::acf_field( $f, 'field_' ), $def['fields'] ),
 			'location'       => self::acf_location( $def['location'] ),
 			'position'       => 'acf_after_title',
-			'style'          => 'seamless',
+			'style'          => 'default',
+			'menu_order'     => (int) array_search( $key, array_keys( self::schema() ), true ),
 			'hide_on_screen' => array( 'the_content' ),
 		);
 	}
@@ -216,6 +241,10 @@ class Fields {
 	 */
 	private static function acf_field( array $f, string $prefix ): array {
 		$field = $f + array( 'key' => $prefix . $f['name'] );
+		if ( isset( $field['width'] ) ) {
+			$field['wrapper'] = array( 'width' => $field['width'] );
+			unset( $field['width'] );
+		}
 		if ( 'wysiwyg' === $f['type'] ) {
 			$field += array(
 				'tabs'         => 'visual',
@@ -241,9 +270,10 @@ class Fields {
 	 * @param string $label Label.
 	 * @param string $type  ACF type.
 	 * @param string $hint  Instructions.
+	 * @param string $width Share of the row in percent, for boxes that sit side by side.
 	 * @return array<string,string>
 	 */
-	private static function field( string $name, string $label, string $type, string $hint ): array {
+	private static function field( string $name, string $label, string $type, string $hint, string $width = '' ): array {
 		$field = array(
 			'name'  => $name,
 			'label' => $label,
@@ -251,6 +281,9 @@ class Fields {
 		);
 		if ( '' !== $hint ) {
 			$field['instructions'] = $hint;
+		}
+		if ( '' !== $width ) {
+			$field['width'] = $width;
 		}
 		return $field;
 	}

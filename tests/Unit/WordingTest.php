@@ -40,7 +40,7 @@ class WordingTest extends WP_UnitTestCase {
 	}
 
 	public function test_defaults_cover_home_and_settings_fields(): void {
-		$missing = array_diff( $this->field_names( array( 'home', 'settings' ) ), array_keys( Wording::defaults() ) );
+		$missing = array_diff( $this->field_names( array( 'home_hero', 'home_ages', 'home_rows', 'home_gift', 'home_trust', 'settings' ) ), array_keys( Wording::defaults() ) );
 		$this->assertSame( array(), array_values( $missing ) );
 	}
 
