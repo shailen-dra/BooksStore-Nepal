@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Theme {
 
-	public const VERSION = '0.1.10';
+	public const VERSION = '0.1.11';
 
 	/** Class on an empty group block where the plugin's book details render. */
 	public const DETAILS_SLOT_CLASS = 'bsn-book-details-slot';
@@ -63,6 +63,8 @@ final class Theme {
 		add_action( 'wp_enqueue_scripts', array( self::class, 'defer_jquery' ), 100 );
 		add_action( 'wp_head', array( self::class, 'mark_inlinable_styles' ), 0 );
 		add_filter( 'styles_inline_size_limit', array( self::class, 'inline_size_limit' ) );
+		add_filter( 'woocommerce_get_image_size_thumbnail', array( self::class, 'card_image_size' ) );
+		add_filter( 'woocommerce_get_image_size_single', array( self::class, 'book_page_image_size' ) );
 		add_filter( 'style_loader_tag', array( self::class, 'filter_deferred_style_tag' ), 10, 4 );
 		add_action( 'init', array( self::class, 'register_pattern_category' ) );
 		add_action( 'wp', array( self::class, 'relocate_book_details' ) );
@@ -88,6 +90,37 @@ final class Theme {
 		if ( is_front_page() ) {
 			wp_enqueue_script( 'bsn-slider', get_stylesheet_directory_uri() . '/assets/js/slider.js', array(), self::VERSION, array( 'in_footer' => true, 'strategy' => 'defer' ) );
 		}
+	}
+
+	/** Book photos are portrait 3:4, the same shape as the drawn covers. Recommended upload: 1200 × 1600. */
+	public const CARD_IMAGE = array(
+		'width'  => 600,
+		'height' => 800,
+		'crop'   => 1,
+	);
+
+	/**
+	 * Card pictures (sliders, shop, related books, cart): 600 × 800, cut to 3:4 from the centre. Cards
+	 * are at most about 210 px wide on screen, so 600 stays sharp on 2× and 3× screens.
+	 *
+	 * @param mixed $size WooCommerce's size (square 300 × 300 by default).
+	 */
+	public static function card_image_size( $size ): array {
+		return self::CARD_IMAGE;
+	}
+
+	/**
+	 * The big picture on a book's page: up to 460 px wide on screen, so 1000 px wide keeps it sharp on 2×
+	 * screens. Not cut; the 3:4 frame in style.css lines it up.
+	 *
+	 * @param mixed $size WooCommerce's size (600 wide by default).
+	 */
+	public static function book_page_image_size( $size ): array {
+		return array(
+			'width'  => 1000,
+			'height' => 0,
+			'crop'   => 0,
+		);
 	}
 
 	/**

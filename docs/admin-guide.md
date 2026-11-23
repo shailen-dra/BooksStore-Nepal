@@ -17,6 +17,7 @@ Contents:
 9. [Change the home page wording](#9-change-the-home-page-wording)
 10. [Shop settings (footer)](#10-shop-settings-footer)
 11. [How the shop looks on Google and in shared links](#11-how-the-shop-looks-on-google-and-in-shared-links)
+12. [Picture sizes](#12-picture-sizes)
 
 ---
 
@@ -32,7 +33,7 @@ Contents:
    1. Choose it from the **Add existing** drop-down (the list is on the Attributes tab).
    2. Click in the **Value(s)** box and choose one or more values (for example Age group: `4–7`; Language: `Nepali`; Book type: `Story`).
    3. Click **Save attributes**.
-6. On the right, click **Set product image** and upload the cover photo. Use **Add product gallery images** for extra photos (back cover, inside pages).
+6. On the right, click **Set product image** and upload the cover photo: a portrait picture **1200 × 1600 pixels** (see [section 12](#12-picture-sizes)). If you skip this, the shop draws a coloured cover with the title instead. Only this one photo is shown; photos under **Add product gallery images** do not appear on the site.
 7. Under **Product categories**, tick a category if you use them.
 8. Click **Publish**. The book now appears in the shop.
 
@@ -279,6 +280,29 @@ When someone finds the shop on Google, or shares a link on Facebook, Viber or Wh
 - **Other pages** (About us, Delivery, FAQ and so on) use the first words of the page.
 
 Add a cover photo to each book: shared links then show it as a picture. To give the shop its own browser-tab icon, go to **Appearance › Editor**, click the shop name, and choose a **Site Icon** (a square image, at least 512 × 512 pixels). Until you do, the tab shows the orange book logo.
+
+---
+
+## 12. Picture sizes
+
+The shop uses only two kinds of picture. Everything else (the logo, the books drawn at the top of the home page, the age buttons, the icons) is built into the design and needs no upload.
+
+| Picture | Where it appears | Size to upload | Shape | File |
+|---|---|---|---|---|
+| **Book cover photo** (the **Product image** of each book) | The *New arrivals*, *Best sellers* and *Our favourites* sliders on the home page, the Shop page, search results, the book's own page, the cart and checkout, and link previews on Facebook, Viber and WhatsApp | **1200 × 1600 pixels** (at least 900 × 1200) | Portrait, **3 : 4** (taller than wide) | JPG, under 500 KB |
+| **Site Icon** (Appearance › Editor › Site Identity) | The browser tab, bookmarks, and phone home screens | **512 × 512 pixels** | Square | PNG |
+
+The sliders have no pictures of their own: they show the cover photos of the books you choose for them in the **Home page** form (section 9).
+
+Tips for cover photos:
+
+- **Keep the 3 : 4 shape.** The shop shows every cover in a 3 : 4 frame. A photo of another shape is trimmed to fit, from the middle outwards, so the edges of a wide or very tall photo are cut off.
+- **Fill the frame with the cover.** Photograph or scan the cover straight on, then crop away the table or background so only the cover is left.
+- **Make it small enough.** A phone photo is often 3–5 MB. Shrink it to 1200 × 1600 and save it as JPG (quality about 80%) so it is under 500 KB; big files make the shop slow on mobile data. Free tools such as squoosh.app do this in the browser.
+- **Do not add text, prices or borders** to the photo. The shop shows the title, the age and the price next to it.
+- **Fill in Alternative Text** when you upload (on the right of the upload window), for example *Cover of The Monkey Temple Mystery*. Blind customers' screen readers read it out.
+
+WordPress makes the smaller copies the shop needs (600 × 800 for the cards, 1000 wide for the book's page) by itself when you upload.
 
 ---
 

@@ -62,6 +62,8 @@ body {
 	font-size: 15px;
 }
 
+/* inline-flex drops the prefix's trailing space ("Ages 8–12" read as "Ages8–12"); keep it. */
+.bsn-pill .wp-block-post-terms__prefix { white-space: pre; }
 .bsn-pill--mint { background: var(--wp--custom--color--mint); color: var(--wp--custom--color--green); }
 .bsn-pill--sky { background: var(--wp--custom--color--sky); color: var(--wp--custom--color--sky-strong); }
 .bsn-pill--rose { background: var(--wp--custom--color--rose); color: var(--wp--custom--color--rose-strong); }
@@ -327,7 +329,14 @@ body {
 .bsn-products .wc-block-product > * { margin: 0; }
 .wc-block-components-product-image { position: relative; }
 .wc-block-components-product-image a { position: relative; display: block; }
-.wc-block-components-product-image img { border-radius: var(--wp--custom--radius--medium); }
+.wc-block-components-product-image img {
+	/* Same 3:4 frame as the drawn covers, whatever shape the uploaded photo is. */
+	width: 100%;
+	height: auto !important;
+	aspect-ratio: 3 / 4 !important;
+	object-fit: cover !important;
+	border-radius: var(--wp--custom--radius--medium);
+}
 
 .bsn-cover {
 	display: flex;
